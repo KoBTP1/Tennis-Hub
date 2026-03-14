@@ -15,10 +15,10 @@ function AuthenticatedArea() {
   const mainScreenName = useMemo(() => {
     const role = (user?.role || "").toLowerCase();
     if (role === "admin") {
-      return "AdminDashboardScreen";
+      return "AdminMainScreen";
     }
-    if (role === "owner" || role === "vendor") {
-      return "VendorDashboardScreen";
+    if (role === "owner") {
+      return "OwnerDashboardScreen";
     }
     return "UserMainScreen";
   }, [user?.role]);

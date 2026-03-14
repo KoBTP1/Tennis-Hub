@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import AppHeader from "../../components/AppHeader";
 import Card from "../../components/Card";
 import GradientBackground from "../../components/GradientBackground";
@@ -7,11 +7,48 @@ import GradientButton from "../../components/GradientButton";
 import ScreenContainer from "../../components/ScreenContainer";
 import StatCard from "../../components/StatCard";
 import { useAuth } from "../../context/AuthContext";
+import { getAdminOverviewReport } from "../../services/adminService";
 import { colors } from "../../styles/theme";
 
-export default function AdminDashboardScreen() {
-  const { user, logout } = useAuth();
+export default function AdminDashboardScreen({ onNavigate }) {
+  const { user, token, logout } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isLoadingOverview, setIsLoadingOverview] = useState(true);
+  const [overview, setOverview] = useState({
+    totals: { users: 0, courts: 0, bookings: 0, revenue: 0, activeBookings: 0 },
+  });
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadOverview = async () => {
+      if (!token) {
+        setIsLoadingOverview(false);
+        return;
+      }
+
+      try {
+        setIsLoadingOverview(true);
+        const response = await getAdminOverviewReport({ token });
+        if (!mounted) {
+          return;
+        }
+
+        setOverview(response.data || { totals: { users: 0, courts: 0, bookings: 0, revenue: 0, activeBookings: 0 } });
+      } catch (error) {
+        Alert.alert("Load dashboard failed", error.message);
+      } finally {
+        if (mounted) {
+          setIsLoadingOverview(false);
+        }
+      }
+    };
+
+    loadOverview();
+    return () => {
+      mounted = false;
+    };
+  }, [token]);
 
   const handleLogout = async () => {
     if (isLoggingOut) {
@@ -42,20 +79,27 @@ export default function AdminDashboardScreen() {
         </GradientBackground>
 
         <View style={styles.gridRow}>
-          <StatCard value="156" label="Total Users" subtitle="+12 this month" accent={colors.info} />
-          <StatCard value="23" label="Total Courts" subtitle="Active courts" accent={colors.success} />
+          <StatCard value={overview.totals.users} label="Total Users" subtitle="From database" accent={colors.info} />
+          <StatCard value={overview.totals.courts} label="Total Courts" subtitle="From database" accent={colors.success} />
         </View>
         <View style={styles.gridRow}>
-          <StatCard value="892" label="Total Bookings" subtitle="45 active now" accent={colors.info} />
-          <StatCard value="$24,560" label="Total Revenue" subtitle="All time" accent={colors.success} />
+          <StatCard value={overview.totals.bookings} label="Total Bookings" subtitle="All statuses" accent={colors.info} />
+          <StatCard value={`$${overview.totals.revenue}`} label="Total Revenue" subtitle="All time" accent={colors.success} />
         </View>
+        {isLoadingOverview ? <ActivityIndicator size="small" color={colors.info} /> : null}
 
         <Text style={styles.section}>Quick Access</Text>
-        {["Manage Users", "Manage Courts", "View Reports"].map((item) => (
-          <Card key={item} style={styles.actionCard}>
-            <Text style={styles.actionText}>{item}</Text>
-            <Text style={styles.arrow}>→</Text>
-          </Card>
+        {[
+          { label: "Manage Users", key: "users" },
+          { label: "Manage Courts", key: "courts" },
+          { label: "View Reports", key: "reports" },
+        ].map((item) => (
+          <TouchableOpacity key={item.label} activeOpacity={0.85} onPress={() => onNavigate?.(item.key)}>
+            <Card style={styles.actionCard}>
+              <Text style={styles.actionText}>{item.label}</Text>
+              <Text style={styles.arrow}>→</Text>
+            </Card>
+          </TouchableOpacity>
         ))}
 
         <Text style={styles.section}>Recent Activity</Text>

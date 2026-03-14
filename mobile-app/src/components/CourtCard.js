@@ -37,7 +37,12 @@ export default function CourtCard({
       {actions.length ? (
         <View style={styles.actionRow}>
           {actions.map((action) => (
-            <TouchableOpacity key={action.label} style={styles.actionBtn}>
+            <TouchableOpacity
+              key={action.label}
+              style={[styles.actionBtn, action.disabled ? styles.actionDisabled : null]}
+              onPress={action.onPress}
+              disabled={Boolean(action.disabled)}
+            >
               <Text style={[styles.actionText, action.type === "danger" ? styles.danger : null]}>{action.label}</Text>
             </TouchableOpacity>
           ))}
@@ -68,6 +73,7 @@ const styles = StyleSheet.create({
   sub: { color: colors.textSecondary, fontSize: 13 },
   actionRow: { flexDirection: "row", marginTop: 10, gap: 8 },
   actionBtn: { backgroundColor: colors.infoSoft, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 7 },
+  actionDisabled: { opacity: 0.45 },
   actionText: { color: colors.info, fontWeight: "600" },
   danger: { color: colors.danger },
 });

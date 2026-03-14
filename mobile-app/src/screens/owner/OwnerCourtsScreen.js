@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import AppHeader from "../../components/AppHeader";
 import CourtCard from "../../components/CourtCard";
 import GradientButton from "../../components/GradientButton";
@@ -11,7 +11,7 @@ const myCourts = [
   { name: "University Tennis Courts", location: "University District", price: "$20/hour", surface: "Hard", rating: "4.5", reviews: 203 },
 ];
 
-export default function VendorCourtsScreen() {
+export default function OwnerCourtsScreen() {
   return (
     <View style={styles.root}>
       <AppHeader title="Manage Courts" leftText="‹" />

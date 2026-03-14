@@ -17,6 +17,18 @@ function protect(req, res, next) {
   }
 }
 
+function authorizeRoles(...roles) {
+  return (req, res, next) => {
+    const currentRole = req.user?.role;
+    if (!currentRole || !roles.includes(currentRole)) {
+      return res.status(403).json({ message: "Forbidden." });
+    }
+
+    return next();
+  };
+}
+
 module.exports = {
   protect,
+  authorizeRoles,
 };

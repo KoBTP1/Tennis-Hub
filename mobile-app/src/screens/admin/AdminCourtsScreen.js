@@ -1,65 +1,171 @@
-import React from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import AppHeader from "../../components/AppHeader";
 import Card from "../../components/Card";
 import CourtCard from "../../components/CourtCard";
 import ScreenContainer from "../../components/ScreenContainer";
+import { useAuth } from "../../context/AuthContext";
+import { getAdminCourts, updateAdminCourtStatus } from "../../services/adminService";
 import { colors, radius } from "../../styles/theme";
 
-const courts = [
-  { name: "Downtown Tennis Center", location: "Downtown", price: "$25/hour", rating: "4.8", reviews: 124, badge: "Active" },
-  { name: "Sunrise Sports Club", location: "Eastside", price: "$30/hour", rating: "4.9", reviews: 89, badge: "Active" },
-  { name: "University Tennis Courts", location: "University District", price: "$20/hour", rating: "4.5", reviews: 203, badge: "Active" },
-];
+const DEFAULT_STATS = {
+  totalCourts: 0,
+  byStatus: { pending: 0, approved: 0, suspended: 0, rejected: 0 },
+};
 
-export default function AdminCourtsScreen() {
+export default function AdminCourtsScreen({ onNavigate }) {
+  const { token } = useAuth();
+  const [courts, setCourts] = useState([]);
+  const [stats, setStats] = useState(DEFAULT_STATS);
+  const [totalCourts, setTotalCourts] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [keyword, setKeyword] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("all");
+
+  const loadCourts = useCallback(
+    async (keywordOverride = "") => {
+      if (!token) {
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        const response = await getAdminCourts({
+          token,
+          keyword: keywordOverride,
+          status: selectedStatus,
+          page: 1,
+          limit: 50,
+        });
+        setCourts(response.data || []);
+        setStats(response.stats || DEFAULT_STATS);
+        setTotalCourts(response.pagination?.total || 0);
+      } catch (error) {
+        Alert.alert("Load courts failed", error.message);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [token, selectedStatus]
+  );
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadCourts(keyword.trim());
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [keyword, loadCourts]);
+
+  const filters = useMemo(
+    () => [
+      { key: "all", label: "All" },
+      { key: "approved", label: "Approved" },
+      { key: "pending", label: "Pending" },
+      { key: "suspended", label: "Suspended" },
+    ],
+    []
+  );
+
+  const handleUpdateStatus = async (court, status) => {
+    if (!token || isUpdating) {
+      return;
+    }
+
+    try {
+      setIsUpdating(true);
+      await updateAdminCourtStatus({
+        token,
+        courtId: court.mongoId || court.id,
+        status,
+      });
+      await loadCourts(keyword.trim());
+      Alert.alert("Success", `Court ${court.name} is now ${status}.`);
+    } catch (error) {
+      Alert.alert("Update failed", error.message);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const getBadge = (status) => {
+    if (!status) {
+      return "Pending";
+    }
+
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
   return (
     <View style={styles.root}>
-      <AppHeader title="Manage Courts" leftText="‹" />
+      <AppHeader title="Manage Courts" leftText="‹" onLeftPress={() => onNavigate?.("dashboard")} />
       <ScreenContainer>
         <Card style={styles.searchCard}>
           <TextInput
             placeholder="Search courts by name, location or owner..."
             placeholderTextColor="#9ca3af"
             style={styles.searchInput}
+            value={keyword}
+            onChangeText={setKeyword}
           />
         </Card>
 
         <View style={styles.filters}>
-          {["All", "Active", "Pending"].map((f, index) => (
-            <View key={f} style={[styles.pill, index === 0 ? styles.pillActive : null]}>
-              <Text style={[styles.pillText, index === 0 ? styles.pillTextActive : null]}>{f}</Text>
-            </View>
+          {filters.map((item) => (
+            <TouchableOpacity
+              key={item.key}
+              style={[styles.pill, selectedStatus === item.key ? styles.pillActive : null]}
+              onPress={() => setSelectedStatus(item.key)}
+            >
+              <Text style={[styles.pillText, selectedStatus === item.key ? styles.pillTextActive : null]}>{item.label}</Text>
+            </TouchableOpacity>
           ))}
         </View>
 
         <View style={styles.statRow}>
           <Card style={styles.statCard}>
-            <Text style={styles.statValue}>5</Text>
+            <Text style={styles.statValue}>{stats.totalCourts || 0}</Text>
             <Text style={styles.statLabel}>Total Courts</Text>
           </Card>
           <Card style={styles.statCard}>
-            <Text style={styles.statValue}>5</Text>
-            <Text style={styles.statLabel}>Active</Text>
+            <Text style={styles.statValue}>{stats.byStatus.approved || 0}</Text>
+            <Text style={styles.statLabel}>Approved</Text>
           </Card>
           <Card style={styles.statCard}>
-            <Text style={styles.statValue}>0</Text>
+            <Text style={styles.statValue}>{stats.byStatus.pending || 0}</Text>
             <Text style={styles.statLabel}>Pending</Text>
           </Card>
         </View>
 
-        <Text style={styles.count}>5 courts found</Text>
-        {courts.map((court) => (
-          <CourtCard
-            key={court.name}
-            {...court}
-            actions={[
-              { label: "View Details" },
-              { label: "Approve" },
-              { label: "Suspend", type: "danger" },
-            ]}
-          />
-        ))}
+        <Text style={styles.count}>{totalCourts} courts found</Text>
+        {isLoading ? <ActivityIndicator size="large" color={colors.info} style={styles.loader} /> : null}
+        {!isLoading && courts.length === 0 ? <Text style={styles.empty}>No courts found.</Text> : null}
+        {!isLoading &&
+          courts.map((court) => (
+            <CourtCard
+              key={court.id}
+              name={court.name}
+              location={court.location}
+              price={`$${court.pricePerHour}/hour`}
+              rating={court.rating ? court.rating.toFixed(1) : "-"}
+              reviews={court.reviewsCount || 0}
+              badge={getBadge(court.status)}
+              actions={[
+                {
+                  label: "Approve",
+                  disabled: court.status === "approved",
+                  onPress: () => handleUpdateStatus(court, "approved"),
+                },
+                {
+                  label: "Suspend",
+                  type: "danger",
+                  disabled: court.status === "suspended",
+                  onPress: () => handleUpdateStatus(court, "suspended"),
+                },
+              ]}
+            />
+          ))}
       </ScreenContainer>
     </View>
   );
@@ -79,4 +185,6 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 30, fontWeight: "800", color: colors.info },
   statLabel: { color: colors.textSecondary },
   count: { color: colors.textSecondary, marginTop: 4 },
+  loader: { marginTop: 12 },
+  empty: { color: colors.textSecondary, fontStyle: "italic", marginTop: 6 },
 });

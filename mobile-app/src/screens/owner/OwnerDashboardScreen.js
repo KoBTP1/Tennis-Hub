@@ -10,7 +10,7 @@ import StatCard from "../../components/StatCard";
 import { useAuth } from "../../context/AuthContext";
 import { colors } from "../../styles/theme";
 
-export default function VendorDashboardScreen() {
+export default function OwnerDashboardScreen() {
   const { user, logout } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 

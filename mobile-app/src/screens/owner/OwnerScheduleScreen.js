@@ -16,7 +16,7 @@ const slots = [
   { time: "16:00", price: "$25", status: "Available" },
 ];
 
-export default function VendorScheduleScreen() {
+export default function OwnerScheduleScreen() {
   return (
     <View style={styles.root}>
       <AppHeader title="Manage Schedule" leftText="‹" />
