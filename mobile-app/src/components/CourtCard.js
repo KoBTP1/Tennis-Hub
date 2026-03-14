@@ -13,12 +13,14 @@ export default function CourtCard({
   reviews,
   badge,
   actions = [],
+  onPress,
 }) {
   return (
     <Card style={styles.card}>
-      <View style={styles.row}>
-        <View style={styles.placeholder} />
-        <View style={styles.content}>
+      <TouchableOpacity activeOpacity={onPress ? 0.7 : 1} onPress={onPress}>
+        <View style={styles.row}>
+          <View style={styles.placeholder} />
+          <View style={styles.content}>
           <View style={styles.titleRow}>
             <Text style={styles.title} numberOfLines={1}>
               {name}
@@ -34,6 +36,7 @@ export default function CourtCard({
           </View>
         </View>
       </View>
+      </TouchableOpacity>
       {actions.length ? (
         <View style={styles.actionRow}>
           {actions.map((action) => (

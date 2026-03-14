@@ -2,12 +2,6 @@ const mongoose = require("mongoose");
 
 const courtSchema = new mongoose.Schema(
   {
-    id: {
-      type: Number,
-      required: true,
-      unique: true,
-      index: true,
-    },
     name: {
       type: String,
       required: true,
@@ -18,35 +12,29 @@ const courtSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    pricePerHour: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    description: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    images: {
+      type: [String],
+      default: [],
+    },
     ownerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      default: null,
-    },
-    ownerName: {
-      type: String,
-      default: "",
-      trim: true,
-    },
-    pricePerHour: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-    rating: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-    reviewsCount: {
-      type: Number,
-      default: 0,
-      min: 0,
+      required: true,
     },
     status: {
       type: String,
-      enum: ["pending", "approved", "suspended", "rejected"],
-      default: "pending",
+      enum: ["active", "inactive", "suspended"],
+      default: "active",
       index: true,
     },
   },

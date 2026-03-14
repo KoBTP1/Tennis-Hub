@@ -1,18 +1,48 @@
-import React from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import React, { useState, useEffect } from "react";
+import { StyleSheet, Text, TextInput, View, ActivityIndicator, Alert } from "react-native";
 import AppHeader from "../../components/AppHeader";
 import Card from "../../components/Card";
 import CourtCard from "../../components/CourtCard";
 import ScreenContainer from "../../components/ScreenContainer";
 import TabBar from "../../components/TabBar";
 import { colors, radius } from "../../styles/theme";
-
-const courts = [
-  { name: "Downtown Tennis Center", location: "Downtown", price: "$25/hr", distance: "0.5 km", surface: "Hard Court", rating: "4.8", reviews: 124 },
-  { name: "Sunrise Sports Club", location: "Eastside", price: "$30/hr", distance: "1.2 km", surface: "Clay Court", rating: "4.9", reviews: 89 },
-];
+import { getCourts } from "../../services/courtService";
+import CourtDetailScreen from "./CourtDetailScreen";
 
 export default function UserSearchScreen({ onTabPress }) {
+  const [courts, setCourts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedCourtId, setSelectedCourtId] = useState(null);
+
+  const fetchCourts = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const data = await getCourts();
+      setCourts(data);
+    } catch (err) {
+      setError(err.message || "Failed to load courts");
+      Alert.alert("Error", err.message || "Failed to load courts");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCourts();
+  }, []);
+
+  if (selectedCourtId) {
+    return (
+      <CourtDetailScreen
+        courtId={selectedCourtId}
+        onBack={() => setSelectedCourtId(null)}
+        onTabPress={onTabPress}
+      />
+    );
+  }
+
   return (
     <View style={styles.root}>
       <AppHeader title="Search Courts" leftText="‹" />
@@ -39,10 +69,26 @@ export default function UserSearchScreen({ onTabPress }) {
           ))}
         </Card>
 
-        <Text style={styles.resultCount}>5 courts found</Text>
-        {courts.map((court) => (
-          <CourtCard key={court.name} {...court} />
-        ))}
+        <Text style={styles.resultCount}>
+          {isLoading ? "Searching..." : `${courts.length} courts found`}
+        </Text>
+        
+        {isLoading ? (
+          <ActivityIndicator size="large" color={colors.info} style={styles.loader} />
+        ) : error ? (
+          <Text style={styles.errorText}>{error}</Text>
+        ) : (
+          courts.map((court) => (
+            <CourtCard
+              key={court._id}
+              name={court.name}
+              location={court.location}
+              price={`$${court.pricing?.perHour || 0}/hr`}
+              surface={court.surfaceArea}
+              onPress={() => setSelectedCourtId(court._id)}
+            />
+          ))
+        )}
       </ScreenContainer>
       <TabBar tabs={["Home", "Search", "Bookings", "Profile"]} active="Search" onTabPress={onTabPress} />
     </View>
@@ -61,5 +107,7 @@ const styles = StyleSheet.create({
   chipTextActive: { color: colors.white },
   locationsTitle: { fontSize: 16, fontWeight: "700", marginBottom: 10, color: colors.textPrimary },
   locationItem: { marginBottom: 10, color: colors.textPrimary, fontSize: 15 },
-  resultCount: { color: colors.textSecondary, marginTop: 4 },
+  resultCount: { color: colors.textSecondary, marginTop: 4, marginBottom: 8 },
+  loader: { marginTop: 20 },
+  errorText: { color: colors.danger, marginTop: 20, textAlign: "center" },
 });
