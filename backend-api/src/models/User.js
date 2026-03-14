@@ -34,6 +34,11 @@ const userSchema = new mongoose.Schema(
       enum: ["player", "owner", "admin"],
       default: "player",
     },
+    isBlocked: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
   },
   {
     timestamps: true,

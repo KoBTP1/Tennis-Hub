@@ -26,7 +26,7 @@ const items = [
   },
 ];
 
-export default function VendorBookingsScreen() {
+export default function OwnerBookingsScreen() {
   return (
     <View style={styles.root}>
       <AppHeader title="View Bookings" leftText="‹" />

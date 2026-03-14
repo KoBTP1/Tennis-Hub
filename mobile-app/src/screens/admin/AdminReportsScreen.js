@@ -1,22 +1,79 @@
-import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
 import AppHeader from "../../components/AppHeader";
 import Card from "../../components/Card";
 import GradientBackground from "../../components/GradientBackground";
 import ScreenContainer from "../../components/ScreenContainer";
 import StatCard from "../../components/StatCard";
+import { useAuth } from "../../context/AuthContext";
+import { getAdminMonthlyReport, getAdminOverviewReport } from "../../services/adminService";
 import { colors } from "../../styles/theme";
 
-const topCourts = [
-  { rank: 1, name: "Downtown Tennis Center", bookings: "45 bookings", revenue: "$1125" },
-  { rank: 2, name: "Sunrise Sports Club", bookings: "38 bookings", revenue: "$1140" },
-  { rank: 3, name: "University Tennis Courts", bookings: "42 bookings", revenue: "$840" },
-];
+const DEFAULT_OVERVIEW = {
+  totals: { users: 0, courts: 0, bookings: 0, revenue: 0, activeBookings: 0 },
+  bookingStatus: { confirmed: 0, completed: 0, cancelled: 0 },
+  topCourts: [],
+};
 
-export default function AdminReportsScreen() {
+export default function AdminReportsScreen({ onNavigate }) {
+  const { token } = useAuth();
+  const currentYear = new Date().getFullYear();
+  const [overview, setOverview] = useState(DEFAULT_OVERVIEW);
+  const [monthly, setMonthly] = useState({ year: currentYear, months: [] });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadReports = async () => {
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        const [overviewResponse, monthlyResponse] = await Promise.all([
+          getAdminOverviewReport({ token }),
+          getAdminMonthlyReport({ token, year: currentYear }),
+        ]);
+
+        if (!mounted) {
+          return;
+        }
+
+        setOverview(overviewResponse.data || DEFAULT_OVERVIEW);
+        setMonthly(monthlyResponse.data || { year: currentYear, months: [] });
+      } catch (error) {
+        Alert.alert("Load reports failed", error.message);
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadReports();
+    return () => {
+      mounted = false;
+    };
+  }, [token, currentYear]);
+
+  const monthlyRows = useMemo(() => {
+    return (monthly.months || []).filter((item) => item.bookings > 0 || item.revenue > 0);
+  }, [monthly.months]);
+
+  const topCourts = overview.topCourts || [];
+  const maxBookingStatusValue = Math.max(
+    1,
+    overview.bookingStatus.confirmed || 0,
+    overview.bookingStatus.completed || 0,
+    overview.bookingStatus.cancelled || 0
+  );
+
   return (
     <View style={styles.root}>
-      <AppHeader title="Reports & Analytics" leftText="‹" />
+      <AppHeader title="Reports & Analytics" leftText="‹" onLeftPress={() => onNavigate?.("dashboard")} />
       <ScreenContainer>
         <GradientBackground style={styles.export}>
           <Text style={styles.exportText}>Export Full Report</Text>
@@ -24,25 +81,33 @@ export default function AdminReportsScreen() {
 
         <Text style={styles.section}>Overview</Text>
         <View style={styles.gridRow}>
-          <StatCard value="156" label="Total Users" subtitle="+12 this month" />
-          <StatCard value="892" label="Total Bookings" subtitle="+78 this month" accent={colors.purple} />
+          <StatCard value={overview.totals.users} label="Total Users" subtitle="From database" />
+          <StatCard value={overview.totals.bookings} label="Total Bookings" subtitle="All statuses" accent={colors.purple} />
         </View>
         <View style={styles.gridRow}>
-          <StatCard value="$24,560" label="Total Revenue" subtitle="All time" accent={colors.success} />
-          <StatCard value="45" label="Active Bookings" subtitle="Right now" accent={colors.info} />
+          <StatCard value={`$${overview.totals.revenue}`} label="Total Revenue" subtitle="All time" accent={colors.success} />
+          <StatCard value={overview.totals.activeBookings} label="Active Bookings" subtitle="Confirmed" accent={colors.info} />
         </View>
 
-        <Text style={styles.section}>Monthly Trends (2026)</Text>
+        {isLoading ? <ActivityIndicator size="large" color={colors.info} style={styles.loader} /> : null}
+
+        <Text style={styles.section}>Monthly Trends ({monthly.year || currentYear})</Text>
         <Card>
-          {[
-            "Jan                             65 bookings   $1820",
-            "Feb                             72 bookings   $2145",
-            "Mar                             78 bookings   $2456",
-          ].map((line) => (
-            <View key={line} style={styles.trendRow}>
-              <Text style={styles.trendText}>{line}</Text>
+          {monthlyRows.length === 0 ? <Text style={styles.empty}>No booking data for this year.</Text> : null}
+          {monthlyRows.map((line) => (
+            <View key={line.month} style={styles.trendRow}>
+              <Text style={styles.trendText}>
+                Month {line.month} - {line.bookings} bookings - ${line.revenue}
+              </Text>
               <View style={styles.progressTrack}>
-                <View style={styles.progressFill} />
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${Math.min(100, Math.round((line.bookings / Math.max(1, overview.totals.bookings)) * 100))}%`,
+                    },
+                  ]}
+                />
               </View>
             </View>
           ))}
@@ -50,16 +115,17 @@ export default function AdminReportsScreen() {
 
         <Text style={styles.section}>Top Performing Courts</Text>
         <Card>
-          {topCourts.map((court) => (
-            <View key={court.rank} style={styles.courtRow}>
+          {topCourts.length === 0 ? <Text style={styles.empty}>No top courts yet.</Text> : null}
+          {topCourts.map((court, index) => (
+            <View key={String(court.courtId)} style={styles.courtRow}>
               <View style={styles.rank}>
-                <Text style={styles.rankText}>{court.rank}</Text>
+                <Text style={styles.rankText}>{index + 1}</Text>
               </View>
               <View style={styles.courtInfo}>
-                <Text style={styles.courtName}>{court.name}</Text>
-                <Text style={styles.courtSub}>{court.bookings}</Text>
+                <Text style={styles.courtName}>{court.courtName}</Text>
+                <Text style={styles.courtSub}>{court.totalBookings} bookings</Text>
               </View>
-              <Text style={styles.revenue}>{court.revenue}</Text>
+              <Text style={styles.revenue}>${court.revenue}</Text>
             </View>
           ))}
         </Card>
@@ -67,15 +133,23 @@ export default function AdminReportsScreen() {
         <Text style={styles.section}>Booking Status</Text>
         <Card>
           {[
-            { label: "Confirmed", value: 45, color: colors.success },
-            { label: "Completed", value: 847, color: "#6b7280" },
-            { label: "Cancelled", value: 12, color: colors.danger },
+            { label: "Confirmed", value: overview.bookingStatus.confirmed || 0, color: colors.success },
+            { label: "Completed", value: overview.bookingStatus.completed || 0, color: "#6b7280" },
+            { label: "Cancelled", value: overview.bookingStatus.cancelled || 0, color: colors.danger },
           ].map((status) => (
             <View key={status.label} style={styles.statusRow}>
               <Text style={styles.statusLabel}>{status.label}</Text>
               <Text style={styles.statusValue}>{status.value}</Text>
               <View style={styles.statusTrack}>
-                <View style={[styles.statusFill, { backgroundColor: status.color }]} />
+                <View
+                  style={[
+                    styles.statusFill,
+                    {
+                      backgroundColor: status.color,
+                      width: `${Math.min(100, Math.round((status.value / maxBookingStatusValue) * 100))}%`,
+                    },
+                  ]}
+                />
               </View>
             </View>
           ))}
@@ -91,6 +165,8 @@ const styles = StyleSheet.create({
   exportText: { color: colors.white, fontWeight: "700", fontSize: 16 },
   section: { color: colors.textPrimary, fontSize: 18, fontWeight: "700", marginTop: 4 },
   gridRow: { flexDirection: "row", gap: 10 },
+  loader: { marginTop: 8 },
+  empty: { color: colors.textSecondary, fontStyle: "italic", marginBottom: 8 },
   trendRow: { marginBottom: 12 },
   trendText: { color: colors.textPrimary, marginBottom: 4 },
   progressTrack: { height: 6, borderRadius: 99, backgroundColor: "#e5e7eb" },

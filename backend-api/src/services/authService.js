@@ -9,6 +9,7 @@ function sanitizeUser(user) {
     email: user.email,
     phone: user.phone,
     role: user.role,
+    status: user.isBlocked ? "blocked" : "active",
   };
 }
 
@@ -56,6 +57,12 @@ async function login(payload) {
   if (!user) {
     const error = new Error("Invalid email or password.");
     error.statusCode = 401;
+    throw error;
+  }
+
+  if (user.isBlocked) {
+    const error = new Error("Your account has been blocked. Please contact admin.");
+    error.statusCode = 403;
     throw error;
   }
 
