@@ -29,3 +29,6 @@ ios/build/
 # OS files
 .DS_Store
 Thumbs.db
+
+# project docs (local notes)
+docx/
