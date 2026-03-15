@@ -8,5 +8,6 @@ const router = express.Router();
 router.post("/", protect, bookingController.createBooking);
 router.get("/my", protect, bookingController.getMyBookings);
 router.patch("/:id/cancel", protect, bookingController.cancelBooking);
+router.delete("/:id", protect, bookingController.cancelBooking);
 
 module.exports = router;

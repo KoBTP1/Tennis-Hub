@@ -7,11 +7,13 @@ import GradientButton from "../../components/GradientButton";
 import ScreenContainer from "../../components/ScreenContainer";
 import StatCard from "../../components/StatCard";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 import { getAdminOverviewReport } from "../../services/adminService";
 import { colors } from "../../styles/theme";
 
 export default function AdminDashboardScreen({ onNavigate }) {
   const { user, token, logout } = useAuth();
+  const { theme, isDarkMode } = useTheme();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isLoadingOverview, setIsLoadingOverview] = useState(true);
   const [overview, setOverview] = useState({
@@ -64,7 +66,7 @@ export default function AdminDashboardScreen({ onNavigate }) {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: theme.background }]}>
       <AppHeader title="Admin Dashboard" />
       <ScreenContainer>
         <GradientBackground style={styles.hero}>
@@ -72,7 +74,7 @@ export default function AdminDashboardScreen({ onNavigate }) {
             <Text style={styles.avatarText}>{(user?.name || "A").slice(0, 1).toUpperCase()}</Text>
           </View>
           <View style={styles.info}>
-            <Text style={styles.heroTitle}>{user?.name || "Admin User"}</Text>
+            <Text style={[styles.heroTitle, isDarkMode ? styles.softWhiteText : null]}>{user?.name || "Admin User"}</Text>
             <Text style={styles.heroSub}>{user?.email || "-"}</Text>
             <Text style={styles.heroMeta}>Role: {(user?.role || "admin").toUpperCase()}</Text>
           </View>
@@ -88,7 +90,7 @@ export default function AdminDashboardScreen({ onNavigate }) {
         </View>
         {isLoadingOverview ? <ActivityIndicator size="small" color={colors.info} /> : null}
 
-        <Text style={styles.section}>Quick Access</Text>
+        <Text style={[styles.section, { color: theme.text }]}>Quick Access</Text>
         {[
           { label: "Manage Users", key: "users" },
           { label: "Manage Courts", key: "courts" },
@@ -96,17 +98,11 @@ export default function AdminDashboardScreen({ onNavigate }) {
         ].map((item) => (
           <TouchableOpacity key={item.label} activeOpacity={0.85} onPress={() => onNavigate?.(item.key)}>
             <Card style={styles.actionCard}>
-              <Text style={styles.actionText}>{item.label}</Text>
+              <Text style={[styles.actionText, { color: theme.text }]}>{item.label}</Text>
               <Text style={styles.arrow}>→</Text>
             </Card>
           </TouchableOpacity>
         ))}
-
-        <Text style={styles.section}>Recent Activity</Text>
-        <Card>
-          <Text style={styles.activityTitle}>New user registered</Text>
-          <Text style={styles.activitySub}>Emily Chen joined as a player</Text>
-        </Card>
 
         <GradientButton
           label={isLoggingOut ? "Logging out..." : "Logout"}
@@ -128,13 +124,12 @@ const styles = StyleSheet.create({
   heroTitle: { color: colors.white, fontSize: 28, fontWeight: "800" },
   heroSub: { color: colors.infoSoft, marginTop: 4, fontSize: 14 },
   heroMeta: { color: "#e5e7eb", marginTop: 5, fontSize: 13, fontWeight: "600" },
+  softWhiteText: { color: "#E5E5E5" },
   gridRow: { flexDirection: "row", gap: 10 },
   section: { fontSize: 26, fontWeight: "700", color: colors.textPrimary, marginTop: 8 },
   actionCard: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 18 },
   actionText: { fontSize: 17, color: colors.textPrimary, fontWeight: "600" },
   arrow: { color: colors.textSecondary, fontSize: 18 },
-  activityTitle: { color: colors.textPrimary, fontWeight: "700", fontSize: 16 },
-  activitySub: { color: colors.textSecondary, marginTop: 4 },
   logoutButton: { marginTop: 6, marginBottom: 4 },
   logoutButtonText: { color: colors.white },
 });

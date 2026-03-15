@@ -1,5 +1,6 @@
 import React from "react";
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { useTheme } from "../context/ThemeContext";
 import { colors, radius, spacing } from "../styles/theme";
 
 export default function InputField({
@@ -17,15 +18,16 @@ export default function InputField({
   rightText,
   onRightPress,
 }) {
+  const { theme } = useTheme();
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>{label}</Text>
-      <View style={styles.inputWrap}>
+      <Text style={[styles.label, { color: theme.text }]}>{label}</Text>
+      <View style={[styles.inputWrap, { backgroundColor: theme.inputBackground, borderColor: theme.border }]}>
         <Text style={styles.icon}>{leftIcon || " "}</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { color: theme.text }]}
           placeholder={placeholder}
-          placeholderTextColor="#9ca3af"
+          placeholderTextColor={theme.textSecondary}
           secureTextEntry={secureTextEntry}
           value={value}
           onChangeText={onChangeText}
@@ -37,7 +39,7 @@ export default function InputField({
         />
         {rightText ? (
           <TouchableOpacity onPress={onRightPress} style={styles.rightAction} disabled={!editable}>
-            <Text style={styles.rightActionText}>{rightText}</Text>
+            <Text style={[styles.rightActionText, { color: theme.success }]}>{rightText}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -47,18 +49,16 @@ export default function InputField({
 
 const styles = StyleSheet.create({
   wrap: { marginBottom: spacing.md },
-  label: { color: colors.textPrimary, fontSize: 14, marginBottom: spacing.xs, fontWeight: "600" },
+  label: { fontSize: 14, marginBottom: spacing.xs, fontWeight: "600" },
   inputWrap: {
-    backgroundColor: "#f7f8fb",
     borderRadius: radius.sm,
     borderWidth: 1,
-    borderColor: "#eef0f4",
     flexDirection: "row",
     alignItems: "center",
     minHeight: 44,
   },
   icon: { width: 24, textAlign: "center", color: "#9ca3af", fontSize: 16, marginLeft: 6 },
-  input: { flex: 1, color: colors.textPrimary, paddingVertical: 10, paddingRight: 12, fontSize: 16 },
+  input: { flex: 1, paddingVertical: 10, paddingRight: 12, fontSize: 16 },
   rightAction: { paddingHorizontal: 10, paddingVertical: 8 },
-  rightActionText: { color: colors.success, fontWeight: "700", fontSize: 13 },
+  rightActionText: { fontWeight: "700", fontSize: 13 },
 });

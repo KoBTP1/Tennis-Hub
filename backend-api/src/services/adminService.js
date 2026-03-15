@@ -199,6 +199,7 @@ async function updateCourtStatus({ courtId, status }) {
 }
 
 async function getOverviewReport() {
+  const revenueExpr = { $ifNull: ["$totalPrice", 0] };
   const [totalUsers, totalCourts, totalBookings, statusAgg, revenueAgg, topCourtsAgg] = await Promise.all([
     User.countDocuments({}),
     Court.countDocuments({}),
@@ -206,10 +207,10 @@ async function getOverviewReport() {
     Booking.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
     Booking.aggregate([
       { $match: { status: { $ne: "cancelled" } } },
-      { $group: { _id: null, totalRevenue: { $sum: "$totalPrice" } } },
+      { $group: { _id: null, totalRevenue: { $sum: revenueExpr } } },
     ]),
     Booking.aggregate([
-      { $group: { _id: "$courtId", totalBookings: { $sum: 1 }, revenue: { $sum: "$totalPrice" } } },
+      { $group: { _id: "$courtId", totalBookings: { $sum: 1 }, revenue: { $sum: revenueExpr } } },
       { $sort: { totalBookings: -1 } },
       { $limit: 3 },
       {
@@ -252,6 +253,7 @@ async function getOverviewReport() {
 }
 
 async function getMonthlyReport(year) {
+  const revenueExpr = { $ifNull: ["$totalPrice", 0] };
   const selectedYear = Number(year) || new Date().getFullYear();
   const startDate = new Date(`${selectedYear}-01-01T00:00:00.000Z`);
   const endDate = new Date(`${selectedYear + 1}-01-01T00:00:00.000Z`);
@@ -268,7 +270,7 @@ async function getMonthlyReport(year) {
         bookings: { $sum: 1 },
         revenue: {
           $sum: {
-            $cond: [{ $eq: ["$status", "cancelled"] }, 0, "$totalPrice"],
+            $cond: [{ $eq: ["$status", "cancelled"] }, 0, revenueExpr],
           },
         },
       },

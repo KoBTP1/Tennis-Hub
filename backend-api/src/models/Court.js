@@ -33,8 +33,8 @@ const courtSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["active", "inactive", "suspended"],
-      default: "active",
+      enum: ["pending", "approved", "suspended", "rejected"],
+      default: "pending",
       index: true,
     },
   },

@@ -1,12 +1,14 @@
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { useTheme } from "../context/ThemeContext";
 import { colors, radius, spacing } from "../styles/theme";
 
 export default function GradientButton({ label, onPress, style, textStyle }) {
+  const { theme } = useTheme();
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={[styles.touch, style]}>
-      <LinearGradient colors={["#0FAF7C", "#1E66E8"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradient}>
+      <LinearGradient colors={[theme.gradientStart, theme.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradient}>
         <Text style={[styles.label, textStyle]}>{label}</Text>
       </LinearGradient>
     </TouchableOpacity>

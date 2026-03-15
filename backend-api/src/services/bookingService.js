@@ -1,5 +1,6 @@
 const Booking = require("../models/Booking");
 const CourtSlot = require("../models/CourtSlot");
+const Court = require("../models/Court");
 const mongoose = require("mongoose");
 
 async function createBooking(userId, courtId, slotId) {
@@ -26,6 +27,11 @@ async function createBooking(userId, courtId, slotId) {
       throw new Error("Slot does not belong to the specified court");
     }
 
+    const court = await Court.findById(courtId).session(session);
+    if (!court) {
+      throw new Error("Court not found");
+    }
+
     slot.isBooked = true;
     await slot.save({ session });
 
@@ -34,6 +40,7 @@ async function createBooking(userId, courtId, slotId) {
       courtId,
       slotId,
       bookingDate: new Date(),
+      totalPrice: court.pricePerHour || 0,
       status: "confirmed",
     });
 

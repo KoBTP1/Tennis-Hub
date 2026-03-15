@@ -2,7 +2,7 @@ const Court = require("../models/Court");
 const CourtSlot = require("../models/CourtSlot");
 
 async function searchCourts({ keyword, location, page = 1, limit = 20 }) {
-  const query = { status: "active" };
+  const query = { status: "approved" };
   if (keyword) {
     query.name = { $regex: keyword, $options: "i" };
   }
