@@ -1,0 +1,8 @@
+[{
+  "_id": {
+    "$oid": "69b0d062a83af88bf55ead85"
+  },
+  "booking_id": 1,
+  "payment_method": "momo",
+  "amount": 200000
+}]
