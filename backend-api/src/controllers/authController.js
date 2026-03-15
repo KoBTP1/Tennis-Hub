@@ -59,8 +59,63 @@ async function getMe(req, res, next) {
   }
 }
 
+function normalizePhone(phone) {
+  return String(phone || "").trim().replace(/[\s-]/g, "");
+}
+
+function isValidPhone(phone) {
+  if (!phone) {
+    return true;
+  }
+  return /^\+?\d{9,15}$/.test(phone);
+}
+
+async function updateMe(req, res, next) {
+  try {
+    const userId = req.user?.userId || req.user?.id;
+    const { name, phone, currentPassword, newPassword } = req.body || {};
+
+    if (name !== undefined && !String(name).trim()) {
+      return res.status(400).json({ message: "Name cannot be empty." });
+    }
+
+    const normalizedPhone = normalizePhone(phone);
+    if (phone !== undefined && !isValidPhone(normalizedPhone)) {
+      return res.status(400).json({ message: "Phone must be 9-15 digits and may start with '+'." });
+    }
+
+    if (newPassword !== undefined) {
+      if (!String(newPassword).trim()) {
+        return res.status(400).json({ message: "New password cannot be empty." });
+      }
+      if (!currentPassword) {
+        return res.status(400).json({ message: "Current password is required to change password." });
+      }
+      if (String(newPassword).trim().length < 6) {
+        return res.status(400).json({ message: "New password must be at least 6 characters." });
+      }
+    }
+
+    const user = await authService.updateProfile(userId, {
+      name,
+      phone: phone === undefined ? undefined : normalizedPhone,
+      currentPassword,
+      newPassword,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully.",
+      user,
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   register,
   login,
   getMe,
+  updateMe,
 };

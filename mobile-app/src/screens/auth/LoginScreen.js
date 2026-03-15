@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { KeyboardAvoidingView, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Formik } from "formik";
 import * as Yup from "yup";
 import GradientButton from "../../components/GradientButton";
 import InputField from "../../components/InputField";
 import ScreenContainer from "../../components/ScreenContainer";
 import { LinearGradient } from "expo-linear-gradient";
+import { useTheme } from "../../context/ThemeContext";
 import { colors, radius } from "../../styles/theme";
 import { useAuth } from "../../context/AuthContext";
 
@@ -24,6 +25,7 @@ function getLoginValidationMessage(errors, submitCount) {
 
 export default function LoginScreen({ onNavigateRegister }) {
   const { login } = useAuth();
+  const { theme } = useTheme();
   const [errorMessage, setErrorMessage] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -45,12 +47,13 @@ export default function LoginScreen({ onNavigateRegister }) {
   };
 
   return (
-    <ScreenContainer contentStyle={[styles.content, { paddingTop: 20 + topInset }]}>
-      <LinearGradient colors={["#0FAF7C", "#1E66E8"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.logo}>
-        <Text style={styles.logoText}>🎾</Text>
-      </LinearGradient>
-      <Text style={styles.title}>Welcome Back</Text>
-      <Text style={styles.subtitle}>Sign in to book your court</Text>
+    <KeyboardAvoidingView style={styles.keyboardAvoiding} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <ScreenContainer contentStyle={[styles.content, { paddingTop: 20 + topInset }]}>
+        <LinearGradient colors={[theme.gradientStart, theme.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.logo}>
+          <Text style={styles.logoText}>🎾</Text>
+        </LinearGradient>
+        <Text style={[styles.title, { color: theme.text }]}>Welcome Back</Text>
+        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Sign in to book your court</Text>
 
       <Formik
         initialValues={{ email: "", password: "" }}
@@ -114,7 +117,7 @@ export default function LoginScreen({ onNavigateRegister }) {
                 <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
                   {rememberMe ? <View style={styles.checkboxInner} /> : null}
                 </View>
-                <Text style={styles.rememberText}>Remember me</Text>
+                <Text style={[styles.rememberText, { color: theme.text }]}>Remember me</Text>
               </TouchableOpacity>
               <TouchableOpacity>
                 <Text style={styles.forgot}>Forgot password?</Text>
@@ -134,17 +137,19 @@ export default function LoginScreen({ onNavigateRegister }) {
         )}
       </Formik>
 
-      <Text style={styles.footer}>
-        Don&apos;t have an account?{" "}
-        <Text style={styles.footerLink} onPress={onNavigateRegister}>
-          Sign Up
+        <Text style={[styles.footer, { color: theme.textSecondary }]}>
+          Don&apos;t have an account?{" "}
+          <Text style={styles.footerLink} onPress={onNavigateRegister}>
+            Sign Up
+          </Text>
         </Text>
-      </Text>
-    </ScreenContainer>
+      </ScreenContainer>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoiding: { flex: 1 },
   content: { paddingTop: 20, paddingBottom: 24, paddingHorizontal: 20 },
   logo: {
     width: 62,

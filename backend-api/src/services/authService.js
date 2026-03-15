@@ -105,8 +105,54 @@ async function getProfile(userId) {
   return sanitizeUser(user);
 }
 
+async function updateProfile(userId, payload) {
+  const { name, phone, currentPassword, newPassword } = payload || {};
+  const user = await User.findById(userId);
+  if (!user) {
+    const error = new Error("User not found.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (name !== undefined) {
+    user.name = String(name).trim();
+  }
+
+  if (phone !== undefined) {
+    user.phone = String(phone).trim();
+  }
+
+  if (newPassword !== undefined) {
+    let isCurrentPasswordMatch = false;
+    const normalizedCurrentPassword = String(currentPassword || "").trim();
+
+    try {
+      isCurrentPasswordMatch = await bcrypt.compare(normalizedCurrentPassword, user.password);
+    } catch {
+      isCurrentPasswordMatch = false;
+    }
+
+    // Backward compatibility for plain-text passwords that have not been migrated yet.
+    if (!isCurrentPasswordMatch && user.password === normalizedCurrentPassword) {
+      isCurrentPasswordMatch = true;
+    }
+
+    if (!isCurrentPasswordMatch) {
+      const error = new Error("Current password is incorrect.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    user.password = await bcrypt.hash(String(newPassword).trim(), 10);
+  }
+
+  await user.save();
+  return sanitizeUser(user);
+}
+
 module.exports = {
   register,
   login,
   getProfile,
+  updateProfile,
 };

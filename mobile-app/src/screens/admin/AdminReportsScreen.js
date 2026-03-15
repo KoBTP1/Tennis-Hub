@@ -6,6 +6,7 @@ import GradientBackground from "../../components/GradientBackground";
 import ScreenContainer from "../../components/ScreenContainer";
 import StatCard from "../../components/StatCard";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 import { getAdminMonthlyReport, getAdminOverviewReport } from "../../services/adminService";
 import { colors } from "../../styles/theme";
 
@@ -17,6 +18,7 @@ const DEFAULT_OVERVIEW = {
 
 export default function AdminReportsScreen({ onNavigate }) {
   const { token } = useAuth();
+  const { theme } = useTheme();
   const currentYear = new Date().getFullYear();
   const [overview, setOverview] = useState(DEFAULT_OVERVIEW);
   const [monthly, setMonthly] = useState({ year: currentYear, months: [] });
@@ -72,7 +74,7 @@ export default function AdminReportsScreen({ onNavigate }) {
   );
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: theme.background }]}>
       <AppHeader title="Reports & Analytics" leftText="‹" onLeftPress={() => onNavigate?.("dashboard")} />
       <ScreenContainer>
         <GradientBackground style={styles.export}>

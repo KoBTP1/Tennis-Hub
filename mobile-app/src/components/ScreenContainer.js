@@ -1,16 +1,17 @@
 import React from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { colors } from "../styles/theme";
+import { useTheme } from "../context/ThemeContext";
 
-export default function ScreenContainer({ children, contentStyle }) {
+export default function ScreenContainer({ children, contentStyle, backgroundColor }) {
+  const { theme } = useTheme();
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: backgroundColor || theme.background }]}>
       <ScrollView contentContainerStyle={[styles.content, contentStyle]}>{children}</ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1 },
   content: { padding: 14, gap: 12 },
 });

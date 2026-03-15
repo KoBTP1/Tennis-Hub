@@ -1,13 +1,15 @@
 import React, { useState } from "react";
-import { Platform, StatusBar, StyleSheet, Text, View } from "react-native";
+import { KeyboardAvoidingView, Platform, StatusBar, StyleSheet, Text, View } from "react-native";
 import { Formik } from "formik";
 import * as Yup from "yup";
 import GradientButton from "../../components/GradientButton";
 import InputField from "../../components/InputField";
 import ScreenContainer from "../../components/ScreenContainer";
 import { LinearGradient } from "expo-linear-gradient";
+import { useTheme } from "../../context/ThemeContext";
 import { colors } from "../../styles/theme";
 import { useAuth } from "../../context/AuthContext";
+import { getVietnamesePhoneErrorMessage, isValidVietnamesePhone, normalizePhoneNumber } from "../../utils/validation";
 
 const registerValidationSchema = Yup.object().shape({
   name: Yup.string().trim().required("Full name is required."),
@@ -16,7 +18,9 @@ const registerValidationSchema = Yup.object().shape({
   confirmPassword: Yup.string()
     .required("Confirm password is required.")
     .oneOf([Yup.ref("password")], "Confirm password does not match."),
-  phone: Yup.string(),
+  phone: Yup.string()
+    .required("Phone number is required.")
+    .test("vn-phone", getVietnamesePhoneErrorMessage(), (value) => isValidVietnamesePhone(value || "")),
 });
 
 function getRegisterValidationMessage(errors, submitCount) {
@@ -24,11 +28,12 @@ function getRegisterValidationMessage(errors, submitCount) {
     return "";
   }
 
-  return errors.name || errors.email || errors.password || errors.confirmPassword || "";
+  return errors.name || errors.email || errors.phone || errors.password || errors.confirmPassword || "";
 }
 
 export default function RegisterScreen({ onNavigateLogin }) {
   const { register } = useAuth();
+  const { theme } = useTheme();
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -43,7 +48,7 @@ export default function RegisterScreen({ onNavigateLogin }) {
         name: values.name.trim(),
         email: values.email.trim().toLowerCase(),
         password: values.password,
-        phone: values.phone,
+        phone: normalizePhoneNumber(values.phone),
         role: "player",
       });
       setSuccessMessage("Account created successfully. Redirecting to Sign In...");
@@ -59,12 +64,13 @@ export default function RegisterScreen({ onNavigateLogin }) {
   };
 
   return (
-    <ScreenContainer contentStyle={[styles.content, { paddingTop: 20 + topInset }]}>
-      <LinearGradient colors={["#0FAF7C", "#1E66E8"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.logo}>
-        <Text style={styles.logoText}>🎾</Text>
-      </LinearGradient>
-      <Text style={styles.title}>Create Account</Text>
-      <Text style={styles.subtitle}>Join us to book your tennis court</Text>
+    <KeyboardAvoidingView style={styles.keyboardAvoiding} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <ScreenContainer contentStyle={[styles.content, { paddingTop: 20 + topInset }]}>
+        <LinearGradient colors={[theme.gradientStart, theme.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.logo}>
+          <Text style={styles.logoText}>🎾</Text>
+        </LinearGradient>
+        <Text style={[styles.title, { color: theme.text }]}>Create Account</Text>
+        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Join us to book your tennis court</Text>
 
       <Formik
         initialValues={{ name: "", email: "", phone: "", password: "", confirmPassword: "" }}
@@ -119,7 +125,7 @@ export default function RegisterScreen({ onNavigateLogin }) {
 
             <InputField
               label="Phone Number"
-              placeholder="+1 234 567 8900"
+              placeholder="0912345678"
               leftIcon="☎"
               value={values.phone}
               onChangeText={(text) => {
@@ -190,17 +196,19 @@ export default function RegisterScreen({ onNavigateLogin }) {
         )}
       </Formik>
 
-      <Text style={styles.footer}>
-        Already have an account?{" "}
-        <Text style={styles.footerLink} onPress={onNavigateLogin}>
-          Sign In
+        <Text style={[styles.footer, { color: theme.textSecondary }]}>
+          Already have an account?{" "}
+          <Text style={styles.footerLink} onPress={onNavigateLogin}>
+            Sign In
+          </Text>
         </Text>
-      </Text>
-    </ScreenContainer>
+      </ScreenContainer>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoiding: { flex: 1 },
   content: { paddingTop: 20, paddingBottom: 24, paddingHorizontal: 20 },
   logo: {
     width: 62,

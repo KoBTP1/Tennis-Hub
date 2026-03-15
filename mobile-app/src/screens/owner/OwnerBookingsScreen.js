@@ -4,6 +4,7 @@ import AppHeader from "../../components/AppHeader";
 import BookingCard from "../../components/BookingCard";
 import Card from "../../components/Card";
 import ScreenContainer from "../../components/ScreenContainer";
+import { useTheme } from "../../context/ThemeContext";
 import { colors, radius } from "../../styles/theme";
 
 const items = [
@@ -27,8 +28,9 @@ const items = [
 ];
 
 export default function OwnerBookingsScreen() {
+  const { theme } = useTheme();
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: theme.background }]}>
       <AppHeader title="View Bookings" leftText="‹" />
       <ScreenContainer>
         <Card style={styles.filters}>

@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import AppHeader from "../../components/AppHeader";
 import Card from "../../components/Card";
 import CourtCard from "../../components/CourtCard";
 import ScreenContainer from "../../components/ScreenContainer";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 import { getAdminCourts, updateAdminCourtStatus } from "../../services/adminService";
 import { colors, radius } from "../../styles/theme";
 
@@ -15,6 +16,7 @@ const DEFAULT_STATS = {
 
 export default function AdminCourtsScreen({ onNavigate }) {
   const { token } = useAuth();
+  const { theme } = useTheme();
   const [courts, setCourts] = useState([]);
   const [stats, setStats] = useState(DEFAULT_STATS);
   const [totalCourts, setTotalCourts] = useState(0);
@@ -98,18 +100,19 @@ export default function AdminCourtsScreen({ onNavigate }) {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: theme.background }]}>
       <AppHeader title="Manage Courts" leftText="‹" onLeftPress={() => onNavigate?.("dashboard")} />
-      <ScreenContainer>
-        <Card style={styles.searchCard}>
-          <TextInput
-            placeholder="Search courts by name, location or owner..."
-            placeholderTextColor="#9ca3af"
-            style={styles.searchInput}
-            value={keyword}
-            onChangeText={setKeyword}
-          />
-        </Card>
+      <KeyboardAvoidingView style={styles.keyboardAvoiding} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <ScreenContainer>
+          <Card style={styles.searchCard}>
+            <TextInput
+              placeholder="Search courts by name, location or owner..."
+              placeholderTextColor="#9ca3af"
+              style={styles.searchInput}
+              value={keyword}
+              onChangeText={setKeyword}
+            />
+          </Card>
 
         <View style={styles.filters}>
           {filters.map((item) => (
@@ -141,38 +144,40 @@ export default function AdminCourtsScreen({ onNavigate }) {
         <Text style={styles.count}>{totalCourts} courts found</Text>
         {isLoading ? <ActivityIndicator size="large" color={colors.info} style={styles.loader} /> : null}
         {!isLoading && courts.length === 0 ? <Text style={styles.empty}>No courts found.</Text> : null}
-        {!isLoading &&
-          courts.map((court) => (
-            <CourtCard
-              key={court.id}
-              name={court.name}
-              location={court.location}
-              price={`$${court.pricePerHour}/hour`}
-              rating={court.rating ? court.rating.toFixed(1) : "-"}
-              reviews={court.reviewsCount || 0}
-              badge={getBadge(court.status)}
-              actions={[
-                {
-                  label: "Approve",
-                  disabled: court.status === "approved",
-                  onPress: () => handleUpdateStatus(court, "approved"),
-                },
-                {
-                  label: "Suspend",
-                  type: "danger",
-                  disabled: court.status === "suspended",
-                  onPress: () => handleUpdateStatus(court, "suspended"),
-                },
-              ]}
-            />
-          ))}
-      </ScreenContainer>
+          {!isLoading &&
+            courts.map((court) => (
+              <CourtCard
+                key={court.id}
+                name={court.name}
+                location={court.location}
+                price={`$${court.pricePerHour}/hour`}
+                rating={court.rating ? court.rating.toFixed(1) : "-"}
+                reviews={court.reviewsCount || 0}
+                badge={getBadge(court.status)}
+                actions={[
+                  {
+                    label: "Approve",
+                    disabled: court.status === "approved",
+                    onPress: () => handleUpdateStatus(court, "approved"),
+                  },
+                  {
+                    label: "Suspend",
+                    type: "danger",
+                    disabled: court.status === "suspended",
+                    onPress: () => handleUpdateStatus(court, "suspended"),
+                  },
+                ]}
+              />
+            ))}
+        </ScreenContainer>
+      </KeyboardAvoidingView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
+  keyboardAvoiding: { flex: 1 },
   searchCard: { paddingVertical: 6 },
   searchInput: { minHeight: 40, fontSize: 16 },
   filters: { flexDirection: "row", gap: 8 },

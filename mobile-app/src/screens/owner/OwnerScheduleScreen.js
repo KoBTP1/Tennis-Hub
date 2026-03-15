@@ -4,6 +4,7 @@ import AppHeader from "../../components/AppHeader";
 import Card from "../../components/Card";
 import GradientButton from "../../components/GradientButton";
 import ScreenContainer from "../../components/ScreenContainer";
+import { useTheme } from "../../context/ThemeContext";
 import { colors, radius } from "../../styles/theme";
 
 const slots = [
@@ -17,8 +18,9 @@ const slots = [
 ];
 
 export default function OwnerScheduleScreen() {
+  const { theme } = useTheme();
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: theme.background }]}>
       <AppHeader title="Manage Schedule" leftText="‹" />
       <ScreenContainer>
         <Text style={styles.label}>Select Court</Text>

@@ -5,13 +5,36 @@ import BookingCard from "../../components/BookingCard";
 import Card from "../../components/Card";
 import ScreenContainer from "../../components/ScreenContainer";
 import TabBar from "../../components/TabBar";
+import { useTheme } from "../../context/ThemeContext";
 import { colors, radius } from "../../styles/theme";
 import { getMyBookings, cancelBooking } from "../../services/bookingService";
 
+function getPalette(isDarkMode) {
+  if (isDarkMode) {
+    return {
+      background: "#0f172a",
+      card: "#111827",
+      textPrimary: "#E5E5E5",
+      textSecondary: "#94a3b8",
+      border: "#1e293b",
+    };
+  }
+
+  return {
+    background: colors.background,
+    card: colors.white,
+    textPrimary: colors.textPrimary,
+    textSecondary: colors.textSecondary,
+    border: colors.border,
+  };
+}
+
 export default function UserBookingsScreen({ onTabPress }) {
+  const { isDarkMode } = useTheme();
   const [bookings, setBookings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const palette = getPalette(isDarkMode);
 
   const fetchBookings = async () => {
     try {
@@ -58,13 +81,13 @@ export default function UserBookingsScreen({ onTabPress }) {
   const pastBookings = bookings.filter(b => b.status === "completed" || b.status === "cancelled");
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: palette.background }]}>
       <AppHeader title="My Bookings" />
-      <ScreenContainer>
-        <Card style={styles.tabFilter}>
+      <ScreenContainer backgroundColor={palette.background}>
+        <Card style={[styles.tabFilter, { backgroundColor: palette.card }]}>
           {["All", "Upcoming", "Past"].map((tab, index) => (
             <View key={tab} style={[styles.filterPill, index === 0 ? styles.filterPillActive : null]}>
-              <Text style={[styles.filterText, index === 0 ? styles.filterTextActive : null]}>{tab}</Text>
+              <Text style={[styles.filterText, { color: palette.textPrimary }, index === 0 ? styles.filterTextActive : null]}>{tab}</Text>
             </View>
           ))}
         </Card>
@@ -75,9 +98,9 @@ export default function UserBookingsScreen({ onTabPress }) {
           <Text style={styles.errorText}>{error}</Text>
         ) : (
           <>
-            <Text style={styles.sectionTitle}>Upcoming Bookings</Text>
+            <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Upcoming Bookings</Text>
             {upcomingBookings.length === 0 ? (
-              <Text style={styles.emptyText}>No upcoming bookings.</Text>
+              <Text style={[styles.emptyText, { color: palette.textSecondary }]}>No upcoming bookings.</Text>
             ) : null}
             {upcomingBookings.map((item) => {
               const dateStr = item.slotId?.date ? new Date(item.slotId.date).toDateString() : "";
@@ -98,9 +121,9 @@ export default function UserBookingsScreen({ onTabPress }) {
               );
             })}
 
-            <Text style={styles.sectionTitle}>Past & Cancelled Bookings</Text>
+            <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Past & Cancelled Bookings</Text>
             {pastBookings.length === 0 ? (
-              <Text style={styles.emptyText}>No past bookings.</Text>
+              <Text style={[styles.emptyText, { color: palette.textSecondary }]}>No past bookings.</Text>
             ) : null}
             {pastBookings.map((item) => {
               const dateStr = item.slotId?.date ? new Date(item.slotId.date).toDateString() : "";

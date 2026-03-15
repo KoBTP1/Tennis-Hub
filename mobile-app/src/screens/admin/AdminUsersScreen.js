@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import AppHeader from "../../components/AppHeader";
 import Card from "../../components/Card";
 import ScreenContainer from "../../components/ScreenContainer";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 import { getAdminUsers, updateAdminUserStatus } from "../../services/adminService";
 import { colors, radius } from "../../styles/theme";
 
@@ -15,6 +16,7 @@ const DEFAULT_STATS = {
 
 export default function AdminUsersScreen({ onNavigate }) {
   const { token, user: currentUser } = useAuth();
+  const { theme } = useTheme();
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState(DEFAULT_STATS);
   const [totalUsers, setTotalUsers] = useState(0);
@@ -104,18 +106,19 @@ export default function AdminUsersScreen({ onNavigate }) {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: theme.background }]}>
       <AppHeader title="Manage Users" leftText="‹" onLeftPress={() => onNavigate?.("dashboard")} />
-      <ScreenContainer>
-        <Card style={styles.searchCard}>
-          <TextInput
-            placeholder="Search by name or email..."
-            placeholderTextColor="#9ca3af"
-            style={styles.searchInput}
-            value={searchKeyword}
-            onChangeText={setSearchKeyword}
-          />
-        </Card>
+      <KeyboardAvoidingView style={styles.keyboardAvoiding} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <ScreenContainer>
+          <Card style={styles.searchCard}>
+            <TextInput
+              placeholder="Search by name or email..."
+              placeholderTextColor="#9ca3af"
+              style={styles.searchInput}
+              value={searchKeyword}
+              onChangeText={setSearchKeyword}
+            />
+          </Card>
 
         <View style={styles.roleRow}>
           {roleFilters.map((role) => (
@@ -147,46 +150,48 @@ export default function AdminUsersScreen({ onNavigate }) {
         <Text style={styles.count}>{totalUsers} users found</Text>
         {isLoading ? <ActivityIndicator size="large" color={colors.info} style={styles.loader} /> : null}
         {!isLoading && users.length === 0 ? <Text style={styles.empty}>No users found.</Text> : null}
-        {!isLoading &&
-          users.map((user) => {
-            const isBlocked = user.status === "blocked";
-            const isSelf = currentUser?.id === user.id;
+          {!isLoading &&
+            users.map((user) => {
+              const isBlocked = user.status === "blocked";
+              const isSelf = currentUser?.id === user.id;
 
-            return (
-              <Card key={user.id}>
-                <Text style={styles.name}>{user.name}</Text>
-                <Text style={[styles.badge, isBlocked ? styles.badgeBlocked : styles.badgeActive]}>
-                  {user.role} · {user.status}
-                </Text>
-                <Text style={styles.meta}>{user.email}</Text>
-                <Text style={styles.meta}>{user.phone || "-"}</Text>
-                <Text style={styles.meta}>Joined: {formatDate(user.joinedAt)}</Text>
-                <View style={styles.actionRow}>
-                  <TouchableOpacity
-                    style={[styles.activate, (!isBlocked || isSelf) && styles.actionDisabled]}
-                    onPress={() => handleUpdateStatus(user, "active")}
-                    disabled={!isBlocked || isSelf}
-                  >
-                    <Text style={styles.activateText}>Activate</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.suspend, (isBlocked || isSelf) && styles.actionDisabled]}
-                    onPress={() => handleUpdateStatus(user, "blocked")}
-                    disabled={isBlocked || isSelf}
-                  >
-                    <Text style={styles.suspendText}>Suspend</Text>
-                  </TouchableOpacity>
-                </View>
-              </Card>
-            );
-          })}
-      </ScreenContainer>
+              return (
+                <Card key={user.id}>
+                  <Text style={styles.name}>{user.name}</Text>
+                  <Text style={[styles.badge, isBlocked ? styles.badgeBlocked : styles.badgeActive]}>
+                    {user.role} · {user.status}
+                  </Text>
+                  <Text style={styles.meta}>{user.email}</Text>
+                  <Text style={styles.meta}>{user.phone || "-"}</Text>
+                  <Text style={styles.meta}>Joined: {formatDate(user.joinedAt)}</Text>
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity
+                      style={[styles.activate, (!isBlocked || isSelf) && styles.actionDisabled]}
+                      onPress={() => handleUpdateStatus(user, "active")}
+                      disabled={!isBlocked || isSelf}
+                    >
+                      <Text style={styles.activateText}>Activate</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.suspend, (isBlocked || isSelf) && styles.actionDisabled]}
+                      onPress={() => handleUpdateStatus(user, "blocked")}
+                      disabled={isBlocked || isSelf}
+                    >
+                      <Text style={styles.suspendText}>Suspend</Text>
+                    </TouchableOpacity>
+                  </View>
+                </Card>
+              );
+            })}
+        </ScreenContainer>
+      </KeyboardAvoidingView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
+  keyboardAvoiding: { flex: 1 },
   searchCard: { paddingVertical: 6 },
   searchInput: { minHeight: 40, fontSize: 16 },
   roleRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },

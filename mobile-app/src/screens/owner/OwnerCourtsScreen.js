@@ -4,6 +4,7 @@ import AppHeader from "../../components/AppHeader";
 import CourtCard from "../../components/CourtCard";
 import GradientButton from "../../components/GradientButton";
 import ScreenContainer from "../../components/ScreenContainer";
+import { useTheme } from "../../context/ThemeContext";
 import { colors } from "../../styles/theme";
 
 const myCourts = [
@@ -12,8 +13,9 @@ const myCourts = [
 ];
 
 export default function OwnerCourtsScreen() {
+  const { theme } = useTheme();
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: theme.background }]}>
       <AppHeader title="Manage Courts" leftText="‹" />
       <ScreenContainer>
         <GradientButton label="+   Add New Court" />

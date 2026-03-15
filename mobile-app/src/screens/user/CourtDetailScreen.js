@@ -4,16 +4,37 @@ import { Ionicons } from "@expo/vector-icons";
 import AppHeader from "../../components/AppHeader";
 import Card from "../../components/Card";
 import ScreenContainer from "../../components/ScreenContainer";
+import { useTheme } from "../../context/ThemeContext";
 import { colors, radius } from "../../styles/theme";
 import { getCourtDetail, getCourtSlots } from "../../services/courtService";
 import { createBooking } from "../../services/bookingService";
 
+function getPalette(isDarkMode) {
+  if (isDarkMode) {
+    return {
+      background: "#0f172a",
+      card: "#111827",
+      textPrimary: "#E5E5E5",
+      textSecondary: "#94a3b8",
+    };
+  }
+
+  return {
+    background: colors.background,
+    card: colors.white,
+    textPrimary: colors.textPrimary,
+    textSecondary: colors.textSecondary,
+  };
+}
+
 export default function CourtDetailScreen({ courtId, onBack, onTabPress }) {
+  const { isDarkMode } = useTheme();
   const [court, setCourt] = useState(null);
   const [slots, setSlots] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isBooking, setIsBooking] = useState(false);
   const [error, setError] = useState(null);
+  const palette = getPalette(isDarkMode);
 
   // Default to today
   const selectedDate = new Date().toISOString().split("T")[0];
@@ -26,8 +47,8 @@ export default function CourtDetailScreen({ courtId, onBack, onTabPress }) {
         getCourtDetail(courtId),
         getCourtSlots(courtId, selectedDate),
       ]);
-      setCourt(courtData);
-      setSlots(slotsData);
+      setCourt(courtData?.data || null);
+      setSlots(Array.isArray(slotsData?.data) ? slotsData.data : []);
     } catch (err) {
       setError(err.message || "Failed to load court details");
       Alert.alert("Error", err.message || "Failed to load court details");
@@ -59,7 +80,7 @@ export default function CourtDetailScreen({ courtId, onBack, onTabPress }) {
 
   if (isLoading) {
     return (
-      <View style={styles.root}>
+      <View style={[styles.root, { backgroundColor: palette.background }]}>
         <AppHeader title="Court Details" leftText="‹" onLeftPress={onBack} />
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.info} />
@@ -70,7 +91,7 @@ export default function CourtDetailScreen({ courtId, onBack, onTabPress }) {
 
   if (error || !court) {
     return (
-      <View style={styles.root}>
+      <View style={[styles.root, { backgroundColor: palette.background }]}>
         <AppHeader title="Court Details" leftText="‹" onLeftPress={onBack} />
         <View style={styles.center}>
           <Text style={styles.errorText}>{error || "Court not found"}</Text>
@@ -80,32 +101,32 @@ export default function CourtDetailScreen({ courtId, onBack, onTabPress }) {
   }
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: palette.background }]}>
       <AppHeader title={court.name} leftText="‹" onLeftPress={onBack} />
-      <ScreenContainer scroll>
-        <Card>
-          <Text style={styles.title}>{court.name}</Text>
-          <Text style={styles.meta}><Ionicons name="location-outline" size={16} /> {court.location}</Text>
+      <ScreenContainer backgroundColor={palette.background}>
+        <Card style={{ backgroundColor: palette.card }}>
+          <Text style={[styles.title, { color: palette.textPrimary }]}>{court.name}</Text>
+          <Text style={[styles.meta, { color: palette.textSecondary }]}><Ionicons name="location-outline" size={16} /> {court.location}</Text>
           {court.pricing?.perHour ? (
             <Text style={styles.price}>${court.pricing.perHour}/hr</Text>
           ) : null}
-          <Text style={styles.meta}>Surface: {court.surfaceArea}</Text>
+          <Text style={[styles.meta, { color: palette.textSecondary }]}>Surface: {court.surfaceArea}</Text>
           {court.description ? (
-            <Text style={styles.description}>{court.description}</Text>
+            <Text style={[styles.description, { color: palette.textPrimary }]}>{court.description}</Text>
           ) : null}
         </Card>
 
-        <Text style={styles.sectionTitle}>Available Slots ({selectedDate})</Text>
+        <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Available Slots ({selectedDate})</Text>
         
         {!slots || slots.length === 0 ? (
-          <Text style={styles.emptyText}>No available slots for this date.</Text>
+          <Text style={[styles.emptyText, { color: palette.textSecondary }]}>No available slots for this date.</Text>
         ) : (
           slots?.map((slot, index) => {
             const isAvailable = slot.status === "available";
             return (
-              <Card key={index} style={styles.slotCard}>
+              <Card key={index} style={[styles.slotCard, { backgroundColor: palette.card }]}>
                 <View style={styles.slotInfo}>
-                  <Text style={styles.slotTime}>{slot.startTime} - {slot.endTime}</Text>
+                  <Text style={[styles.slotTime, { color: palette.textPrimary }]}>{slot.startTime} - {slot.endTime}</Text>
                   <Text style={[styles.slotStatus, isAvailable ? styles.statusAvailable : styles.statusBooked]}>
                     {slot.status === "available" ? "Available" : "Booked"}
                   </Text>

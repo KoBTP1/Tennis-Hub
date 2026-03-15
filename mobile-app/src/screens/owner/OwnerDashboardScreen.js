@@ -8,10 +8,12 @@ import GradientButton from "../../components/GradientButton";
 import ScreenContainer from "../../components/ScreenContainer";
 import StatCard from "../../components/StatCard";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 import { colors } from "../../styles/theme";
 
 export default function OwnerDashboardScreen() {
   const { user, logout } = useAuth();
+  const { theme, isDarkMode } = useTheme();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
@@ -28,7 +30,7 @@ export default function OwnerDashboardScreen() {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: theme.background }]}>
       <AppHeader title="Owner Dashboard" />
       <ScreenContainer>
         <GradientBackground style={styles.hero}>
@@ -36,7 +38,7 @@ export default function OwnerDashboardScreen() {
             <Text style={styles.avatarText}>{(user?.name || "O").slice(0, 1).toUpperCase()}</Text>
           </View>
           <View style={styles.info}>
-            <Text style={styles.heroTitle}>{user?.name || "Owner User"}</Text>
+            <Text style={[styles.heroTitle, isDarkMode ? styles.softWhiteText : null]}>{user?.name || "Owner User"}</Text>
             <Text style={styles.heroSub}>{user?.email || "-"}</Text>
             <Text style={styles.heroMeta}>Role: {(user?.role || "owner").toUpperCase()}</Text>
           </View>
@@ -51,22 +53,22 @@ export default function OwnerDashboardScreen() {
           <StatCard value="2" label="Total Bookings" accent={colors.info} />
         </View>
 
-        <Text style={styles.section}>Quick Actions</Text>
+        <Text style={[styles.section, { color: theme.text }]}>Quick Actions</Text>
         <Card style={styles.actionCard}>
-          <Text style={styles.actionText}>Add New Court</Text>
+          <Text style={[styles.actionText, { color: theme.text }]}>Add New Court</Text>
           <Text style={styles.arrow}>→</Text>
         </Card>
         <Card style={styles.actionCard}>
-          <Text style={styles.actionText}>Manage Schedule</Text>
+          <Text style={[styles.actionText, { color: theme.text }]}>Manage Schedule</Text>
           <Text style={styles.arrow}>→</Text>
         </Card>
         <Card style={styles.actionCard}>
-          <Text style={styles.actionText}>View Bookings</Text>
+          <Text style={[styles.actionText, { color: theme.text }]}>View Bookings</Text>
           <Text style={styles.arrow}>→</Text>
         </Card>
 
         <View style={styles.sectionRow}>
-          <Text style={styles.section}>Recent Bookings</Text>
+          <Text style={[styles.section, { color: theme.text }]}>Recent Bookings</Text>
           <Text style={styles.link}>View All</Text>
         </View>
         <BookingCard
@@ -97,6 +99,7 @@ const styles = StyleSheet.create({
   heroTitle: { color: colors.white, fontSize: 20, fontWeight: "800" },
   heroSub: { color: colors.infoSoft, marginTop: 3 },
   heroMeta: { color: "#e5e7eb", marginTop: 4, fontSize: 13, fontWeight: "600" },
+  softWhiteText: { color: "#E5E5E5" },
   gridRow: { flexDirection: "row", gap: 10 },
   section: { fontSize: 18, fontWeight: "700", color: colors.textPrimary, marginTop: 4 },
   actionCard: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 18 },

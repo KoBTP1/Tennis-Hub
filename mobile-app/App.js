@@ -1,15 +1,16 @@
 import { StatusBar } from "expo-status-bar";
 import React, { useMemo, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Switch, Text, View } from "react-native";
 import { screenRegistry } from "./src/navigation/screenRegistry";
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
-import { colors } from "./src/styles/theme";
+import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
 
 // Change this key to quickly preview any generated screen.
 const PREVIEW_SCREEN = null;
 
 function AuthenticatedArea() {
   const { user, isBootstrapping, isAuthenticated } = useAuth();
+  const { theme, toggleTheme, isDarkMode } = useTheme();
   const [activeAuthScreen, setActiveAuthScreen] = useState("LoginScreen");
 
   const mainScreenName = useMemo(() => {
@@ -25,8 +26,8 @@ function AuthenticatedArea() {
 
   if (isBootstrapping) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.gradientEnd} />
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: theme.background }}>
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }
@@ -42,15 +43,50 @@ function AuthenticatedArea() {
   }
 
   const MainScreen = screenRegistry[mainScreenName];
-  return <MainScreen />;
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      <MainScreen />
+      <View style={[styles.themeToggle, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <Text style={{ color: theme.text, fontWeight: "700" }}>Dark Mode</Text>
+        <Switch value={isDarkMode} onValueChange={toggleTheme} trackColor={{ true: theme.success }} />
+      </View>
+    </View>
+  );
 }
 
 export default function App() {
   const Screen = PREVIEW_SCREEN ? screenRegistry[PREVIEW_SCREEN] : null;
   return (
-    <View style={{ flex: 1 }}>
-      <StatusBar style="light" />
-      <AuthProvider>{Screen ? <Screen /> : <AuthenticatedArea />}</AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppContainer Screen={Screen} />
+      </AuthProvider>
+    </ThemeProvider>
+  );
+}
+
+function AppContainer({ Screen }) {
+  const { theme, isDarkMode } = useTheme();
+
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      <StatusBar style={isDarkMode ? "light" : "dark"} />
+      {Screen ? <Screen /> : <AuthenticatedArea />}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  themeToggle: {
+    position: "absolute",
+    right: 14,
+    bottom: 92,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+});

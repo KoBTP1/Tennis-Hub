@@ -1,15 +1,18 @@
 import React from "react";
 import { LinearGradient } from "expo-linear-gradient";
+import { useTheme } from "../context/ThemeContext";
 
 export default function GradientBackground({
   children,
   style,
-  colors = ["#0FAF7C", "#1E66E8"],
+  colors,
   start = { x: 0, y: 0 },
   end = { x: 1, y: 0 },
 }) {
+  const { theme } = useTheme();
+  const gradientColors = colors || [theme.gradientStart, theme.gradientEnd];
   return (
-    <LinearGradient colors={colors} start={start} end={end} style={style}>
+    <LinearGradient colors={gradientColors} start={start} end={end} style={style}>
       {children}
     </LinearGradient>
   );

@@ -56,14 +56,10 @@ export async function loginUser({ email, password, rememberMe = false }) {
       user: response.data.user,
     };
 
-    if (rememberMe) {
-      await AsyncStorage.multiSet([
-        [SESSION_STORAGE_KEY, JSON.stringify(session)],
-        [REMEMBER_ME_STORAGE_KEY, "true"],
-      ]);
-    } else {
-      await AsyncStorage.multiRemove([SESSION_STORAGE_KEY, REMEMBER_ME_STORAGE_KEY]);
-    }
+    await AsyncStorage.multiSet([
+      [SESSION_STORAGE_KEY, JSON.stringify(session)],
+      [REMEMBER_ME_STORAGE_KEY, rememberMe ? "true" : "false"],
+    ]);
 
     return session;
   } catch (error) {
@@ -72,12 +68,6 @@ export async function loginUser({ email, password, rememberMe = false }) {
 }
 
 export async function getCurrentSession() {
-  const rememberMeValue = await AsyncStorage.getItem(REMEMBER_ME_STORAGE_KEY);
-  if (rememberMeValue !== "true") {
-    await AsyncStorage.removeItem(SESSION_STORAGE_KEY);
-    return null;
-  }
-
   const rawSession = await AsyncStorage.getItem(SESSION_STORAGE_KEY);
   if (!rawSession) {
     return null;
@@ -106,4 +96,39 @@ export async function getCurrentSession() {
 
 export async function logoutUser() {
   await AsyncStorage.multiRemove([SESSION_STORAGE_KEY, REMEMBER_ME_STORAGE_KEY]);
+}
+
+export async function updateSessionUser(nextUser) {
+  const rawSession = await AsyncStorage.getItem(SESSION_STORAGE_KEY);
+  if (!rawSession) {
+    return null;
+  }
+
+  try {
+    const session = JSON.parse(rawSession);
+    const mergedUser = { ...(session.user || {}), ...(nextUser || {}) };
+    const nextSession = { ...session, user: mergedUser };
+    await AsyncStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(nextSession));
+    return nextSession;
+  } catch {
+    return null;
+  }
+}
+
+async function getAuthHeaders() {
+  const session = await getCurrentSession();
+  if (!session?.token) {
+    return {};
+  }
+  return { Authorization: `Bearer ${session.token}` };
+}
+
+export async function updateMyProfile(payload) {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await axios.patch(`${AUTH_ENDPOINT}/me`, payload, { headers });
+    return response.data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to update profile."));
+  }
 }

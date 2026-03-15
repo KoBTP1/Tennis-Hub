@@ -1,19 +1,46 @@
 import React, { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import AppHeader from "../../components/AppHeader";
 import Card from "../../components/Card";
 import GradientBackground from "../../components/GradientBackground";
 import GradientButton from "../../components/GradientButton";
 import ScreenContainer from "../../components/ScreenContainer";
 import TabBar from "../../components/TabBar";
+import { useTheme } from "../../context/ThemeContext";
 import { colors } from "../../styles/theme";
 import { useAuth } from "../../context/AuthContext";
 
-const menuItems = ["Edit Profile", "Notifications", "Payment Methods", "My Bookings", "Help & Support", "Settings"];
+const menuItems = [
+  { key: "edit-profile", label: "Edit Profile" },
+  { key: "my-bookings", label: "My Bookings" },
+  { key: "settings", label: "Settings" },
+];
 
-export default function UserProfileScreen({ onTabPress }) {
+function getPalette(isDarkMode) {
+  if (isDarkMode) {
+    return {
+      background: "#0f172a",
+      textPrimary: "#E5E5E5",
+      textSecondary: "#94a3b8",
+      border: "#1e293b",
+      card: "#111827",
+    };
+  }
+
+  return {
+    background: colors.background,
+    textPrimary: colors.textPrimary,
+    textSecondary: colors.textSecondary,
+    border: colors.border,
+    card: colors.white,
+  };
+}
+
+export default function UserProfileScreen({ onTabPress, onNavigate }) {
   const { user, logout } = useAuth();
+  const { isDarkMode } = useTheme();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const palette = getPalette(isDarkMode);
 
   const handleLogout = async () => {
     if (isLoggingOut) {
@@ -28,16 +55,25 @@ export default function UserProfileScreen({ onTabPress }) {
     }
   };
 
+  const handleMenuPress = (key) => {
+    if (key === "my-bookings") {
+      onTabPress?.("Bookings");
+      return;
+    }
+
+    onNavigate?.(key);
+  };
+
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: palette.background }]}>
       <AppHeader title="Profile" />
-      <ScreenContainer>
+      <ScreenContainer backgroundColor={palette.background}>
         <GradientBackground style={styles.profileCard}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{(user?.name || "User").slice(0, 1).toUpperCase()}</Text>
           </View>
           <View style={styles.info}>
-            <Text style={styles.name}>{user?.name || "Guest User"}</Text>
+            <Text style={[styles.name, { color: palette.textPrimary }]}>{user?.name || "Guest User"}</Text>
             <Text style={styles.subtitle}>Tennis Enthusiast</Text>
             <Text style={styles.meta}>{user?.email || "-"}</Text>
             <Text style={styles.meta}>{user?.phone || "-"}</Text>
@@ -46,26 +82,34 @@ export default function UserProfileScreen({ onTabPress }) {
         </GradientBackground>
 
         <View style={styles.statsRow}>
-          <Card style={styles.statCard}>
+          <Card style={[styles.statCard, { backgroundColor: palette.card }]}>
             <Text style={styles.statValue}>12</Text>
-            <Text style={styles.statLabel}>Bookings</Text>
+            <Text style={[styles.statLabel, { color: palette.textSecondary }]}>Bookings</Text>
           </Card>
-          <Card style={styles.statCard}>
+          <Card style={[styles.statCard, { backgroundColor: palette.card }]}>
             <Text style={styles.statValue}>8</Text>
-            <Text style={styles.statLabel}>Reviews</Text>
+            <Text style={[styles.statLabel, { color: palette.textSecondary }]}>Reviews</Text>
           </Card>
-          <Card style={styles.statCard}>
+          <Card style={[styles.statCard, { backgroundColor: palette.card }]}>
             <Text style={styles.statValue}>5</Text>
-            <Text style={styles.statLabel}>Favorites</Text>
+            <Text style={[styles.statLabel, { color: palette.textSecondary }]}>Favorites</Text>
           </Card>
         </View>
 
-        <Card style={styles.menuList}>
+        <Card style={[styles.menuList, { backgroundColor: palette.card }]}>
           {menuItems.map((item, index) => (
-            <View key={item} style={[styles.menuItem, index === menuItems.length - 1 ? styles.lastMenu : null]}>
-              <Text style={styles.menuText}>{item}</Text>
+            <TouchableOpacity
+              key={item.key}
+              onPress={() => handleMenuPress(item.key)}
+              style={[
+                styles.menuItem,
+                { borderBottomColor: palette.border },
+                index === menuItems.length - 1 ? styles.lastMenu : null,
+              ]}
+            >
+              <Text style={[styles.menuText, { color: palette.textPrimary }]}>{item.label}</Text>
               <Text style={styles.menuArrow}>→</Text>
-            </View>
+            </TouchableOpacity>
           ))}
         </Card>
 
