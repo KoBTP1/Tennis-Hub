@@ -12,10 +12,22 @@ async function getAuthHeaders() {
   return {};
 }
 
+function getApiErrorMessage(error, fallbackMessage) {
+  if (!axios.isAxiosError(error)) {
+    return error?.message || fallbackMessage;
+  }
+
+  return error?.response?.data?.message || fallbackMessage;
+}
+
 export async function createBooking(data) {
-  const headers = await getAuthHeaders();
-  const response = await axios.post(BOOKINGS_ENDPOINT, data, { headers });
-  return response.data;
+  try {
+    const headers = await getAuthHeaders();
+    const response = await axios.post(BOOKINGS_ENDPOINT, data, { headers });
+    return response.data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Failed to create booking."));
+  }
 }
 
 export async function getMyBookings() {

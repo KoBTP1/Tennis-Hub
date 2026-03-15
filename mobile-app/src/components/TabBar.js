@@ -7,6 +7,8 @@ import { radius } from "../styles/theme";
 const iconByTab = {
   Home: "home-outline",
   Search: "search-outline",
+  Courts: "tennisball-outline",
+  Schedule: "time-outline",
   Bookings: "calendar-outline",
   Profile: "person-outline",
 };
@@ -14,6 +16,8 @@ const iconByTab = {
 const activeIconByTab = {
   Home: "home",
   Search: "search",
+  Courts: "tennisball",
+  Schedule: "time",
   Bookings: "calendar",
   Profile: "person",
 };

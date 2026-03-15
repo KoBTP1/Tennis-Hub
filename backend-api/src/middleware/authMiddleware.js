@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
+const User = require("../models/User");
 
-function protect(req, res, next) {
+async function protect(req, res, next) {
   const authHeader = req.headers.authorization || "";
   const [scheme, token] = authHeader.split(" ");
 
@@ -10,7 +11,20 @@ function protect(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
+    const user = await User.findById(decoded.userId).select("_id email role isBlocked").lean();
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized." });
+    }
+    if (user.isBlocked) {
+      return res.status(403).json({ message: "Your account has been blocked. Please contact admin." });
+    }
+    // Always use live role/state from DB instead of trusting stale JWT claims.
+    req.user = {
+      userId: user._id.toString(),
+      id: user._id.toString(),
+      role: user.role,
+      email: user.email,
+    };
     return next();
   } catch (error) {
     return res.status(401).json({ message: "Invalid or expired token." });

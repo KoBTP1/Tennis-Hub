@@ -1,16 +1,11 @@
-import React, { useMemo, useState } from "react";
-import { StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import AppHeader from "../../components/AppHeader";
 import Card from "../../components/Card";
 import ScreenContainer from "../../components/ScreenContainer";
 import { useTheme } from "../../context/ThemeContext";
 import { colors } from "../../styles/theme";
-
-const defaultNotifications = [
-  { id: "1", title: "Booking confirmed", body: "Your court booking for tomorrow is confirmed.", time: "2h ago", read: false },
-  { id: "2", title: "Promo available", body: "You have a new 10% discount code for weekday bookings.", time: "1d ago", read: false },
-  { id: "3", title: "Reminder", body: "Your upcoming match starts in 30 minutes.", time: "2d ago", read: true },
-];
+import { getMyBookings } from "../../services/bookingService";
 
 function getPalette(isDarkMode) {
   if (isDarkMode) {
@@ -37,8 +32,54 @@ function getPalette(isDarkMode) {
 export default function UserSettingsScreen({ onBack }) {
   const { isDarkMode, toggleTheme } = useTheme();
   const palette = getPalette(isDarkMode);
-  const [notifications, setNotifications] = useState(defaultNotifications);
+  const [isLoading, setIsLoading] = useState(true);
+  const [notifications, setNotifications] = useState([]);
   const unreadCount = useMemo(() => notifications.filter((item) => !item.read).length, [notifications]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadNotifications = async () => {
+      try {
+        setIsLoading(true);
+        const response = await getMyBookings();
+        const items = Array.isArray(response?.data) ? response.data : [];
+
+        const generated = items.slice(0, 8).map((booking) => {
+          const status = booking?.status || "confirmed";
+          const courtName = booking?.courtId?.name || "Court";
+          const date = booking?.slotId?.date ? String(booking.slotId.date).slice(0, 10) : "N/A";
+          const time = booking?.slotId?.startTime && booking?.slotId?.endTime ? `${booking.slotId.startTime}-${booking.slotId.endTime}` : "";
+          return {
+            id: booking?._id || `${courtName}-${date}-${time}`,
+            title: `Booking ${status}`,
+            body: `${courtName} · ${date}${time ? ` · ${time}` : ""}`,
+            time: booking?.createdAt ? new Date(booking.createdAt).toLocaleDateString() : "-",
+            read: status === "completed" || status === "cancelled",
+          };
+        });
+
+        if (!mounted) {
+          return;
+        }
+        setNotifications(generated);
+      } catch {
+        if (!mounted) {
+          return;
+        }
+        setNotifications([]);
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadNotifications();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const markAllAsRead = () => {
     setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
@@ -90,6 +131,10 @@ export default function UserSettingsScreen({ onBack }) {
               {!item.read ? <View style={[styles.unreadDot, { backgroundColor: palette.badge }]} /> : null}
             </View>
           ))}
+          {!isLoading && notifications.length === 0 ? (
+            <Text style={[styles.settingSubtitle, { color: palette.textSecondary }]}>No notifications from booking history yet.</Text>
+          ) : null}
+          {isLoading ? <ActivityIndicator size="small" color={colors.info} /> : null}
         </Card>
       </ScreenContainer>
     </View>

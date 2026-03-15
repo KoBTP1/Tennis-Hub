@@ -1,14 +1,13 @@
 import React, { useMemo, useState } from "react";
+import CourtDetailScreen from "./CourtDetailScreen";
 import EditProfileScreen from "./EditProfileScreen";
 import UserSettingsScreen from "./UserSettingsScreen";
 import UserBookingsScreen from "./UserBookingsScreen";
 import UserHomeScreen from "./UserHomeScreen";
 import UserProfileScreen from "./UserProfileScreen";
-import UserSearchScreen from "./UserSearchScreen";
 
 const tabScreenByName = {
   Home: UserHomeScreen,
-  Search: UserSearchScreen,
   Bookings: UserBookingsScreen,
   Profile: UserProfileScreen,
 };
@@ -16,11 +15,13 @@ const tabScreenByName = {
 export default function UserMainScreen() {
   const [activeTab, setActiveTab] = useState("Home");
   const [activeScreen, setActiveScreen] = useState(null);
+  const [selectedCourtId, setSelectedCourtId] = useState(null);
 
   const ActiveScreen = useMemo(() => tabScreenByName[activeTab] || UserHomeScreen, [activeTab]);
 
   const handleTabPress = (tab) => {
     setActiveScreen(null);
+    setSelectedCourtId(null);
     setActiveTab(tab);
   };
 
@@ -32,10 +33,18 @@ export default function UserMainScreen() {
     return <UserSettingsScreen onBack={() => setActiveScreen(null)} />;
   }
 
+  if (activeScreen === "court-detail" && selectedCourtId) {
+    return <CourtDetailScreen courtId={selectedCourtId} onBack={() => setActiveScreen(null)} onTabPress={handleTabPress} />;
+  }
+
   return (
     <ActiveScreen
       onTabPress={handleTabPress}
       onNavigate={setActiveScreen}
+      onOpenCourt={(courtId) => {
+        setSelectedCourtId(courtId);
+        setActiveScreen("court-detail");
+      }}
     />
   );
 }

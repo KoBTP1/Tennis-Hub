@@ -1,7 +1,6 @@
-import React, { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import AppHeader from "../../components/AppHeader";
-import BookingCard from "../../components/BookingCard";
 import Card from "../../components/Card";
 import GradientBackground from "../../components/GradientBackground";
 import GradientButton from "../../components/GradientButton";
@@ -9,12 +8,46 @@ import ScreenContainer from "../../components/ScreenContainer";
 import StatCard from "../../components/StatCard";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { getOwnerDashboard } from "../../services/ownerService";
 import { colors } from "../../styles/theme";
 
-export default function OwnerDashboardScreen() {
+export default function OwnerDashboardScreen({ onNavigate }) {
   const { user, logout } = useAuth();
   const { theme, isDarkMode } = useTheme();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [dashboard, setDashboard] = useState({
+    totals: { courts: 0, bookings: 0, activeBookings: 0, revenue: 0 },
+  });
+
+  useEffect(() => {
+    let mounted = true;
+    const loadDashboard = async () => {
+      try {
+        setIsLoading(true);
+        const response = await getOwnerDashboard();
+        if (!mounted) {
+          return;
+        }
+        setDashboard(
+          response?.data || {
+            totals: { courts: 0, bookings: 0, activeBookings: 0, revenue: 0 },
+          }
+        );
+      } catch (error) {
+        Alert.alert("Load dashboard failed", error?.response?.data?.message || error.message);
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadDashboard();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleLogout = async () => {
     if (isLoggingOut) {
@@ -45,39 +78,34 @@ export default function OwnerDashboardScreen() {
         </GradientBackground>
 
         <View style={styles.gridRow}>
-          <StatCard value="2" label="My Courts" accent={colors.success} />
-          <StatCard value="1" label="Active Bookings" accent={colors.info} />
+          <StatCard value={dashboard.totals.courts} label="My Courts" accent={colors.success} />
+          <StatCard value={dashboard.totals.activeBookings} label="Active Bookings" accent={colors.info} />
         </View>
         <View style={styles.gridRow}>
-          <StatCard value="$45" label="Total Revenue" accent={colors.success} />
-          <StatCard value="2" label="Total Bookings" accent={colors.info} />
+          <StatCard value={`$${dashboard.totals.revenue}`} label="Total Revenue" accent={colors.success} />
+          <StatCard value={dashboard.totals.bookings} label="Total Bookings" accent={colors.info} />
         </View>
+        {isLoading ? <ActivityIndicator size="small" color={colors.info} /> : null}
 
         <Text style={[styles.section, { color: theme.text }]}>Quick Actions</Text>
-        <Card style={styles.actionCard}>
-          <Text style={[styles.actionText, { color: theme.text }]}>Add New Court</Text>
-          <Text style={styles.arrow}>→</Text>
-        </Card>
-        <Card style={styles.actionCard}>
-          <Text style={[styles.actionText, { color: theme.text }]}>Manage Schedule</Text>
-          <Text style={styles.arrow}>→</Text>
-        </Card>
-        <Card style={styles.actionCard}>
-          <Text style={[styles.actionText, { color: theme.text }]}>View Bookings</Text>
-          <Text style={styles.arrow}>→</Text>
-        </Card>
-
-        <View style={styles.sectionRow}>
-          <Text style={[styles.section, { color: theme.text }]}>Recent Bookings</Text>
-          <Text style={styles.link}>View All</Text>
-        </View>
-        <BookingCard
-          title="Alex Morgan"
-          subtitle="Downtown Tennis Center"
-          date="2026-03-15 at 10:00"
-          amount="$25"
-          status="confirmed"
-        />
+        <TouchableOpacity activeOpacity={0.85} onPress={() => onNavigate?.("Courts")}>
+          <Card style={styles.actionCard}>
+            <Text style={[styles.actionText, { color: theme.text }]}>Add New Court</Text>
+            <Text style={styles.arrow}>→</Text>
+          </Card>
+        </TouchableOpacity>
+        <TouchableOpacity activeOpacity={0.85} onPress={() => onNavigate?.("Schedule")}>
+          <Card style={styles.actionCard}>
+            <Text style={[styles.actionText, { color: theme.text }]}>Manage Schedule</Text>
+            <Text style={styles.arrow}>→</Text>
+          </Card>
+        </TouchableOpacity>
+        <TouchableOpacity activeOpacity={0.85} onPress={() => onNavigate?.("Bookings")}>
+          <Card style={styles.actionCard}>
+            <Text style={[styles.actionText, { color: theme.text }]}>View Bookings</Text>
+            <Text style={styles.arrow}>→</Text>
+          </Card>
+        </TouchableOpacity>
 
         <GradientButton
           label={isLoggingOut ? "Logging out..." : "Logout"}
@@ -105,8 +133,6 @@ const styles = StyleSheet.create({
   actionCard: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 18 },
   actionText: { fontSize: 17, color: colors.textPrimary, fontWeight: "600" },
   arrow: { color: colors.textSecondary, fontSize: 18 },
-  sectionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  link: { color: colors.success, fontWeight: "700" },
   logoutButton: { marginTop: 6, marginBottom: 4 },
   logoutButtonText: { color: colors.white },
 });

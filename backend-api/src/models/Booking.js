@@ -2,6 +2,11 @@ const mongoose = require("mongoose");
 
 const bookingSchema = new mongoose.Schema(
   {
+    id: {
+      type: Number,
+      unique: true,
+      index: true,
+    },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -29,12 +34,38 @@ const bookingSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: ["pending", "confirmed", "cancelled", "completed"],
-      default: "confirmed",
+      default: "pending",
+      index: true,
+    },
+    paymentStatus: {
+      type: String,
+      enum: ["unpaid", "pending", "paid", "failed"],
+      default: "unpaid",
+      index: true,
+    },
+    paymentMethod: {
+      type: String,
+      enum: ["mock", ""],
+      default: "",
+    },
+    paymentOrderId: {
+      type: String,
+      default: "",
       index: true,
     },
   },
   {
     timestamps: true,
+  }
+);
+
+bookingSchema.index(
+  { slotId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      status: { $in: ["pending", "confirmed", "completed"] },
+    },
   }
 );
 

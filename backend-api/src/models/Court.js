@@ -2,6 +2,11 @@ const mongoose = require("mongoose");
 
 const courtSchema = new mongoose.Schema(
   {
+    id: {
+      type: Number,
+      unique: true,
+      index: true,
+    },
     name: {
       type: String,
       required: true,
@@ -36,6 +41,19 @@ const courtSchema = new mongoose.Schema(
       enum: ["pending", "approved", "suspended", "rejected"],
       default: "pending",
       index: true,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    slotRevision: {
+      type: Number,
+      default: 0,
     },
   },
   {

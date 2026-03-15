@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Card from "./Card";
 import { useTheme } from "../context/ThemeContext";
 import { colors, radius } from "../styles/theme";
@@ -13,6 +13,7 @@ export default function CourtCard({
   rating,
   reviews,
   badge,
+  imageUrl,
   actions = [],
   onPress,
 }) {
@@ -21,7 +22,11 @@ export default function CourtCard({
     <Card style={styles.card}>
       <TouchableOpacity activeOpacity={onPress ? 0.7 : 1} onPress={onPress}>
         <View style={styles.row}>
-          <View style={[styles.placeholder, { backgroundColor: theme.mutedBackground }]} />
+          {imageUrl ? (
+            <Image source={{ uri: imageUrl }} style={styles.placeholder} resizeMode="cover" />
+          ) : (
+            <View style={[styles.placeholder, { backgroundColor: theme.mutedBackground }]} />
+          )}
           <View style={styles.content}>
           <View style={styles.titleRow}>
             <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>

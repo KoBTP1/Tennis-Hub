@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Card from "./Card";
 import { useTheme } from "../context/ThemeContext";
 import { colors, radius } from "../styles/theme";
@@ -11,13 +11,18 @@ export default function BookingCard({
   time,
   amount,
   status,
+  imageUrl,
   actions = [],
 }) {
   const { theme } = useTheme();
   return (
     <Card style={styles.card}>
       <View style={styles.row}>
-        <View style={[styles.thumb, { backgroundColor: theme.mutedBackground }]} />
+        {imageUrl ? (
+          <Image source={{ uri: imageUrl }} style={styles.thumb} resizeMode="cover" />
+        ) : (
+          <View style={[styles.thumb, { backgroundColor: theme.mutedBackground }]} />
+        )}
         <View style={styles.info}>
           <View style={styles.titleRow}>
             <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>

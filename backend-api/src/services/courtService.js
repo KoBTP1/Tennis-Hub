@@ -1,18 +1,20 @@
 const Court = require("../models/Court");
 const CourtSlot = require("../models/CourtSlot");
+const { escapeRegex } = require("../utils/requestValidation");
 
 async function searchCourts({ keyword, location, page = 1, limit = 20 }) {
-  const query = { status: "approved" };
+  const query = { status: "approved", isDeleted: { $ne: true } };
   if (keyword) {
-    query.name = { $regex: keyword, $options: "i" };
+    const regex = new RegExp(escapeRegex(keyword), "i");
+    query.$or = [{ name: regex }, { location: regex }];
   }
   if (location) {
-    query.location = { $regex: location, $options: "i" };
+    query.location = new RegExp(escapeRegex(location), "i");
   }
 
   const skip = (page - 1) * limit;
   const items = await Court.find(query)
-    .populate("ownerId", "name email phone")
+    .populate("ownerId", "name")
     .skip(skip)
     .limit(limit)
     .lean();
@@ -32,15 +34,28 @@ async function searchCourts({ keyword, location, page = 1, limit = 20 }) {
 }
 
 async function getCourtDetails(courtId) {
-  const court = await Court.findById(courtId).populate("ownerId", "name email phone").lean();
+  const court = await Court.findOne({ _id: courtId, status: "approved", isDeleted: { $ne: true } })
+    .populate("ownerId", "name")
+    .lean();
   if (!court) {
-    throw new Error("Court not found");
+    const error = new Error("Court not found");
+    error.statusCode = 404;
+    throw error;
   }
   return court;
 }
 
 async function getAvailableSlots(courtId, date) {
-  const query = { courtId };
+  const court = await Court.findOne({ _id: courtId, status: "approved", isDeleted: { $ne: true } })
+    .select("_id")
+    .lean();
+  if (!court) {
+    const error = new Error("Court not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const query = { courtId, isBooked: false };
   if (date) {
     query.date = date; // Expecting YYYY-MM-DD
   }

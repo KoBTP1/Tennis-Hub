@@ -1,9 +1,16 @@
 const bookingService = require("../services/bookingService");
 const Booking = require("../models/Booking");
+const { isValidObjectId } = require("../utils/requestValidation");
 
 async function createBooking(req, res, next) {
   try {
     const { courtId, slotId } = req.body;
+    if (!isValidObjectId(courtId) || !isValidObjectId(slotId)) {
+      return res.status(400).json({
+        success: false,
+        message: "courtId and slotId must be valid ids.",
+      });
+    }
     // req.user handles BOTH 'id' or 'userId' depending on token payload, ensuring it works
     const userId = req.user.id || req.user.userId;
 
@@ -15,7 +22,9 @@ async function createBooking(req, res, next) {
       data: booking,
     });
   } catch (error) {
-    res.status(400); // Bad request for logic errors like already booked
+    if (!error.statusCode) {
+      error.statusCode = 400;
+    }
     return next(error);
   }
 }
@@ -38,6 +47,9 @@ async function getMyBookings(req, res, next) {
 async function cancelBooking(req, res, next) {
   try {
     const { id } = req.params;
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "Invalid booking id." });
+    }
     const userId = req.user.id || req.user.userId;
     const userRole = req.user.role;
 
@@ -53,6 +65,13 @@ async function cancelBooking(req, res, next) {
       });
     }
 
+    if (bookingRecord.paymentStatus === "paid") {
+      return res.status(400).json({
+        success: false,
+        message: "Paid booking cannot be cancelled automatically. Please contact support for refund.",
+      });
+    }
+
     const booking = await bookingService.cancelBooking(id, userId);
 
     return res.status(200).json({
@@ -61,7 +80,6 @@ async function cancelBooking(req, res, next) {
       data: booking,
     });
   } catch (error) {
-    res.status(400);
     return next(error);
   }
 }

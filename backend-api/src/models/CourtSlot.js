@@ -27,7 +27,13 @@ const courtSlotSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    collection: "court_slots",
   }
+);
+
+courtSlotSchema.index(
+  { courtId: 1, date: 1, startTime: 1, endTime: 1 },
+  { unique: true }
 );
 
 module.exports = mongoose.model("CourtSlot", courtSlotSchema);

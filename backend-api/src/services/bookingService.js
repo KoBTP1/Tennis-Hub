@@ -1,64 +1,105 @@
+const mongoose = require("mongoose");
 const Booking = require("../models/Booking");
 const CourtSlot = require("../models/CourtSlot");
 const Court = require("../models/Court");
-const mongoose = require("mongoose");
+const { getNextSequence } = require("../utils/sequence");
 
 async function createBooking(userId, courtId, slotId) {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
-  try {
-    const slot = await CourtSlot.findById(slotId).session(session);
-
-    if (!slot) {
-      throw new Error("Slot not found");
-    }
-
-    const existingBooking = await Booking.findOne({
-      slotId: slotId,
-      status: { $ne: "cancelled" }
-    }).session(session);
-
-    if (existingBooking || slot.isBooked) {
-      throw new Error("This slot is already booked");
-    }
-
-    if (slot.courtId.toString() !== courtId) {
-      throw new Error("Slot does not belong to the specified court");
-    }
-
-    const court = await Court.findById(courtId).session(session);
-    if (!court) {
-      throw new Error("Court not found");
-    }
-
-    slot.isBooked = true;
-    await slot.save({ session });
-
-    const newBooking = new Booking({
-      userId,
-      courtId,
-      slotId,
-      bookingDate: new Date(),
-      totalPrice: court.pricePerHour || 0,
-      status: "confirmed",
-    });
-
-    await newBooking.save({ session });
-    await session.commitTransaction();
-    session.endSession();
-
-    return newBooking;
-  } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
+  if (!courtId || !slotId) {
+    const error = new Error("courtId and slotId are required.");
+    error.statusCode = 400;
     throw error;
+  }
+
+  const session = await mongoose.startSession();
+  try {
+    let createdBooking = null;
+    await session.withTransaction(async () => {
+      const slot = await CourtSlot.findById(slotId).session(session);
+      if (!slot) {
+        const error = new Error("Slot not found");
+        error.statusCode = 404;
+        throw error;
+      }
+
+      if (slot.courtId.toString() !== String(courtId)) {
+        const error = new Error("Slot does not belong to the specified court");
+        error.statusCode = 400;
+        throw error;
+      }
+
+      const court = await Court.findOne({ _id: courtId, isDeleted: { $ne: true } }).session(session);
+      if (!court) {
+        const error = new Error("Court not found");
+        error.statusCode = 404;
+        throw error;
+      }
+
+      if (court.status !== "approved") {
+        const error = new Error("This court is not available for booking.");
+        error.statusCode = 400;
+        throw error;
+      }
+
+      const bookedSlot = await CourtSlot.findOneAndUpdate(
+        { _id: slotId, isBooked: false },
+        { $set: { isBooked: true } },
+        { returnDocument: "after", session }
+      );
+      if (!bookedSlot) {
+        const error = new Error("This slot is already booked");
+        error.statusCode = 400;
+        throw error;
+      }
+
+      const existingActiveBooking = await Booking.findOne({
+        userId,
+        slotId,
+        status: { $in: ["pending", "confirmed", "completed"] },
+      })
+        .session(session)
+        .lean();
+      if (existingActiveBooking) {
+        const error = new Error("Duplicate booking request for this slot.");
+        error.statusCode = 409;
+        throw error;
+      }
+
+      const nextId = await getNextSequence("booking_id", session);
+      const [newBooking] = await Booking.create(
+        [
+          {
+            id: nextId,
+            userId,
+            courtId,
+            slotId,
+            bookingDate: new Date(),
+            totalPrice: court.pricePerHour || 0,
+            status: "pending",
+            paymentStatus: "unpaid",
+            paymentMethod: "",
+            paymentOrderId: "",
+          },
+        ],
+        { session }
+      );
+      createdBooking = newBooking;
+    });
+    return createdBooking;
+  } catch (error) {
+    if (error?.code === 11000) {
+      error.statusCode = 409;
+      error.message = "Duplicate booking detected.";
+    }
+    throw error;
+  } finally {
+    await session.endSession();
   }
 }
 
 async function getMyBookings(userId) {
   const bookings = await Booking.find({ userId })
-    .populate("courtId", "name location")
+    .populate("courtId", "name location images")
     .populate("slotId", "date startTime endTime")
     .populate("userId", "name email")
     .sort({ createdAt: -1 })
@@ -68,41 +109,35 @@ async function getMyBookings(userId) {
 }
 
 async function cancelBooking(bookingId, userId) {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  const booking = await Booking.findById(bookingId);
 
-  try {
-    const booking = await Booking.findById(bookingId).session(session);
-
-    if (!booking) {
-      throw new Error("Booking not found");
-    }
-    // Authorization check is now handled in the controller
-    if (booking.status === "cancelled") {
-      throw new Error("Booking is already cancelled");
-    }
-    if (booking.status === "completed") {
-      throw new Error("Cannot cancel a completed booking");
-    }
-
-    booking.status = "cancelled";
-    await booking.save({ session });
-
-    const slot = await CourtSlot.findById(booking.slotId).session(session);
-    if (slot) {
-      slot.isBooked = false;
-      await slot.save({ session });
-    }
-
-    await session.commitTransaction();
-    session.endSession();
-
-    return booking;
-  } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
+  if (!booking) {
+    const error = new Error("Booking not found");
+    error.statusCode = 404;
     throw error;
   }
+  // Authorization check is now handled in the controller
+  if (booking.status === "cancelled") {
+    const error = new Error("Booking is already cancelled");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (booking.status === "completed") {
+    const error = new Error("Cannot cancel a completed booking");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  booking.status = "cancelled";
+  await booking.save();
+
+  const slot = await CourtSlot.findById(booking.slotId);
+  if (slot) {
+    slot.isBooked = false;
+    await slot.save();
+  }
+
+  return booking;
 }
 
 module.exports = {

@@ -5,12 +5,32 @@ function notFound(req, res) {
 }
 
 function errorHandler(error, req, res, next) {
-  const statusCode = error.statusCode || 500;
-  const message = error.message || "Internal server error.";
-
   if (res.headersSent) {
     return next(error);
   }
+
+  let statusCode = error.statusCode;
+  if (!statusCode && res.statusCode >= 400) {
+    statusCode = res.statusCode;
+  }
+
+  if (!statusCode && error?.name === "ValidationError") {
+    statusCode = 400;
+  }
+
+  if (!statusCode && error?.name === "CastError") {
+    statusCode = 400;
+  }
+
+  if (!statusCode && error?.code === 11000) {
+    statusCode = 409;
+  }
+
+  if (!statusCode) {
+    statusCode = 500;
+  }
+
+  const message = error.message || "Internal server error.";
 
   return res.status(statusCode).json({
     message,

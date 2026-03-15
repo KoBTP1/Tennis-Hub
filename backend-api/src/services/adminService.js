@@ -1,6 +1,7 @@
 const Booking = require("../models/Booking");
 const Court = require("../models/Court");
 const User = require("../models/User");
+const { escapeRegex } = require("../utils/requestValidation");
 
 function parsePage(value, fallback) {
   const parsed = Number(value);
@@ -25,7 +26,7 @@ function buildUserKeywordFilter(keyword) {
     return null;
   }
 
-  const regex = new RegExp(keyword, "i");
+  const regex = new RegExp(escapeRegex(keyword), "i");
   return {
     $or: [{ name: regex }, { email: regex }, { phone: regex }],
   };
@@ -91,7 +92,9 @@ async function listUsers({ keyword = "", role = "", status = "", page = 1, limit
 
   const roleStats = { player: 0, owner: 0, admin: 0 };
   byRole.forEach((item) => {
-    roleStats[item._id] = item.count;
+    if (Object.prototype.hasOwnProperty.call(roleStats, item._id)) {
+      roleStats[item._id] = item.count;
+    }
   });
 
   const statusStats = { active: 0, blocked: 0 };
@@ -146,9 +149,10 @@ async function listCourts({ keyword = "", status = "", page = 1, limit = 20 }) {
   const query = {};
 
   if (keyword) {
-    const regex = new RegExp(keyword.trim(), "i");
+    const regex = new RegExp(escapeRegex(keyword.trim()), "i");
     query.$or = [{ name: regex }, { location: regex }, { ownerName: regex }];
   }
+  query.isDeleted = { $ne: true };
 
   if (status && status !== "all") {
     query.status = status;
@@ -165,7 +169,9 @@ async function listCourts({ keyword = "", status = "", page = 1, limit = 20 }) {
 
   const statusStats = { pending: 0, approved: 0, suspended: 0, rejected: 0 };
   byStatus.forEach((item) => {
-    statusStats[item._id] = item.count;
+    if (Object.prototype.hasOwnProperty.call(statusStats, item._id)) {
+      statusStats[item._id] = item.count;
+    }
   });
 
   return {
@@ -186,7 +192,7 @@ async function updateCourtStatus({ courtId, status }) {
     throw error;
   }
 
-  const court = await Court.findById(courtId);
+  const court = await Court.findOne({ _id: courtId, isDeleted: { $ne: true } });
   if (!court) {
     const error = new Error("Court not found.");
     error.statusCode = 404;
@@ -234,9 +240,11 @@ async function getOverviewReport() {
     ]),
   ]);
 
-  const bookingStatus = { confirmed: 0, completed: 0, cancelled: 0 };
+  const bookingStatus = { pending: 0, confirmed: 0, completed: 0, cancelled: 0 };
   statusAgg.forEach((item) => {
-    bookingStatus[item._id] = item.count;
+    if (item?._id && Object.prototype.hasOwnProperty.call(bookingStatus, item._id)) {
+      bookingStatus[item._id] = item.count;
+    }
   });
 
   return {
@@ -245,7 +253,7 @@ async function getOverviewReport() {
       courts: totalCourts,
       bookings: totalBookings,
       revenue: revenueAgg[0]?.totalRevenue || 0,
-      activeBookings: bookingStatus.confirmed || 0,
+      activeBookings: (bookingStatus.pending || 0) + (bookingStatus.confirmed || 0),
     },
     bookingStatus,
     topCourts: topCourtsAgg,
