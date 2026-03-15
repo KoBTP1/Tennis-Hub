@@ -23,7 +23,7 @@ function getLoginValidationMessage(errors, submitCount) {
   return errors.email || errors.password || "";
 }
 
-export default function LoginScreen({ onNavigateRegister }) {
+export default function LoginScreen({ onNavigateRegister, onNavigateForgotPassword }) {
   const { login } = useAuth();
   const { theme } = useTheme();
   const [errorMessage, setErrorMessage] = useState("");
@@ -119,7 +119,7 @@ export default function LoginScreen({ onNavigateRegister }) {
                 </View>
                 <Text style={[styles.rememberText, { color: theme.text }]}>Remember me</Text>
               </TouchableOpacity>
-              <TouchableOpacity>
+              <TouchableOpacity onPress={onNavigateForgotPassword}>
                 <Text style={styles.forgot}>Forgot password?</Text>
               </TouchableOpacity>
             </View>

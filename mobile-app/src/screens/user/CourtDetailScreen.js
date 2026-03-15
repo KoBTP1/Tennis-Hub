@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, Text, View, ActivityIndicator, Alert, ScrollView, TouchableOpacity } from "react-native";
+import { StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import AppHeader from "../../components/AppHeader";
 import Card from "../../components/Card";
@@ -35,17 +35,17 @@ export default function CourtDetailScreen({ courtId, onBack, onTabPress }) {
   const [isBooking, setIsBooking] = useState(false);
   const [error, setError] = useState(null);
   const palette = getPalette(isDarkMode);
-
-  // Default to today
   const selectedDate = new Date().toISOString().split("T")[0];
 
   const fetchData = async () => {
     try {
       setIsLoading(true);
       setError(null);
+      const isValidDateFormat = /^\d{4}-\d{2}-\d{2}$/.test(String(selectedDate || "").trim());
+      const queryDate = isValidDateFormat ? selectedDate : "";
       const [courtData, slotsData] = await Promise.all([
         getCourtDetail(courtId),
-        getCourtSlots(courtId, selectedDate),
+        getCourtSlots(courtId, queryDate),
       ]);
       setCourt(courtData?.data || null);
       setSlots(Array.isArray(slotsData?.data) ? slotsData.data : []);
@@ -59,14 +59,21 @@ export default function CourtDetailScreen({ courtId, onBack, onTabPress }) {
 
   useEffect(() => {
     fetchData();
-  }, [courtId]);
+  }, [courtId, selectedDate]);
 
   const handleBook = async (slot) => {
+    const selectedCourtId = court?._id || court?.id;
+    const selectedSlotId = slot?._id || slot?.id;
+    if (!selectedCourtId || !selectedSlotId) {
+      Alert.alert("Booking Failed", "Court or slot information is missing.");
+      return;
+    }
+
     try {
       setIsBooking(true);
       await createBooking({
-        courtId: court._id,
-        slotId: slot._id,
+        courtId: selectedCourtId,
+        slotId: selectedSlotId,
       });
       Alert.alert("Success", "Booking created successfully!");
       onBack();
@@ -105,12 +112,15 @@ export default function CourtDetailScreen({ courtId, onBack, onTabPress }) {
       <AppHeader title={court.name} leftText="‹" onLeftPress={onBack} />
       <ScreenContainer backgroundColor={palette.background}>
         <Card style={{ backgroundColor: palette.card }}>
+          {Array.isArray(court.images) && court.images[0] ? (
+            <Image source={{ uri: court.images[0] }} style={styles.courtImage} resizeMode="cover" />
+          ) : null}
           <Text style={[styles.title, { color: palette.textPrimary }]}>{court.name}</Text>
           <Text style={[styles.meta, { color: palette.textSecondary }]}><Ionicons name="location-outline" size={16} /> {court.location}</Text>
-          {court.pricing?.perHour ? (
-            <Text style={styles.price}>${court.pricing.perHour}/hr</Text>
+          {court.pricePerHour ? (
+            <Text style={styles.price}>${court.pricePerHour}/hr</Text>
           ) : null}
-          <Text style={[styles.meta, { color: palette.textSecondary }]}>Surface: {court.surfaceArea}</Text>
+          <Text style={[styles.meta, { color: palette.textSecondary }]}>Status: {court.status || "approved"}</Text>
           {court.description ? (
             <Text style={[styles.description, { color: palette.textPrimary }]}>{court.description}</Text>
           ) : null}
@@ -151,6 +161,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   errorText: { color: colors.danger, fontSize: 16, textAlign: "center" },
+  courtImage: { width: "100%", height: 180, borderRadius: 12, marginBottom: 10 },
   title: { fontSize: 24, fontWeight: "bold", color: colors.textPrimary, marginBottom: 8 },
   meta: { fontSize: 16, color: colors.textSecondary, marginBottom: 4 },
   price: { fontSize: 18, color: colors.success, fontWeight: "bold", marginBottom: 4 },

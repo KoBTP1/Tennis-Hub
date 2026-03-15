@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, Text, View, ActivityIndicator, Alert } from "react-native";
+import { StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity } from "react-native";
 import AppHeader from "../../components/AppHeader";
 import BookingCard from "../../components/BookingCard";
 import Card from "../../components/Card";
@@ -8,6 +8,7 @@ import TabBar from "../../components/TabBar";
 import { useTheme } from "../../context/ThemeContext";
 import { colors, radius } from "../../styles/theme";
 import { getMyBookings, cancelBooking } from "../../services/bookingService";
+import { confirmMockPayment } from "../../services/paymentService";
 
 function getPalette(isDarkMode) {
   if (isDarkMode) {
@@ -34,6 +35,8 @@ export default function UserBookingsScreen({ onTabPress }) {
   const [bookings, setBookings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [activeFilter, setActiveFilter] = useState("All");
+  const [payingBookingId, setPayingBookingId] = useState("");
   const palette = getPalette(isDarkMode);
 
   const fetchBookings = async () => {
@@ -77,18 +80,33 @@ export default function UserBookingsScreen({ onTabPress }) {
     );
   };
 
+  const handleConfirmPayment = async (bookingId) => {
+    try {
+      setPayingBookingId(bookingId);
+      await confirmMockPayment(bookingId);
+      Alert.alert("Payment", "Mock payment confirmed successfully.");
+      await fetchBookings();
+    } catch (err) {
+      Alert.alert("Payment Error", err.message || "Unable to confirm payment.");
+    } finally {
+      setPayingBookingId("");
+    }
+  };
+
   const upcomingBookings = bookings.filter(b => b.status === "confirmed" || b.status === "pending");
   const pastBookings = bookings.filter(b => b.status === "completed" || b.status === "cancelled");
+  const filteredBookings =
+    activeFilter === "Upcoming" ? upcomingBookings : activeFilter === "Past" ? pastBookings : bookings;
 
   return (
     <View style={[styles.root, { backgroundColor: palette.background }]}>
       <AppHeader title="My Bookings" />
       <ScreenContainer backgroundColor={palette.background}>
         <Card style={[styles.tabFilter, { backgroundColor: palette.card }]}>
-          {["All", "Upcoming", "Past"].map((tab, index) => (
-            <View key={tab} style={[styles.filterPill, index === 0 ? styles.filterPillActive : null]}>
-              <Text style={[styles.filterText, { color: palette.textPrimary }, index === 0 ? styles.filterTextActive : null]}>{tab}</Text>
-            </View>
+          {["All", "Upcoming", "Past"].map((tab) => (
+            <TouchableOpacity key={tab} style={[styles.filterPill, activeFilter === tab ? styles.filterPillActive : null]} onPress={() => setActiveFilter(tab)}>
+              <Text style={[styles.filterText, { color: palette.textPrimary }, activeFilter === tab ? styles.filterTextActive : null]}>{tab}</Text>
+            </TouchableOpacity>
           ))}
         </Card>
 
@@ -98,51 +116,45 @@ export default function UserBookingsScreen({ onTabPress }) {
           <Text style={styles.errorText}>{error}</Text>
         ) : (
           <>
-            <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Upcoming Bookings</Text>
-            {upcomingBookings.length === 0 ? (
-              <Text style={[styles.emptyText, { color: palette.textSecondary }]}>No upcoming bookings.</Text>
+            <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>
+              {activeFilter === "All" ? "All Bookings" : `${activeFilter} Bookings`}
+            </Text>
+            {filteredBookings.length === 0 ? (
+              <Text style={[styles.emptyText, { color: palette.textSecondary }]}>No bookings in this filter.</Text>
             ) : null}
-            {upcomingBookings.map((item) => {
+            {filteredBookings.map((item) => {
               const dateStr = item.slotId?.date ? new Date(item.slotId.date).toDateString() : "";
+              const canCancel = item.status === "confirmed" || item.status === "pending";
+              const canPay =
+                item.status === "pending" &&
+                (item.paymentStatus === "unpaid" || item.paymentStatus === "failed" || !item.paymentStatus);
+              const payLabel = payingBookingId === item._id ? "Processing..." : "Confirm Payment";
               return (
                 <BookingCard 
                   key={item._id} 
                   title={item.courtId?.name || "Court"} 
                   subtitle={dateStr}
                   time={`${item.slotId?.startTime || ""} - ${item.slotId?.endTime || ""}`}
-                  amount="Paid"
+                  amount={item.paymentStatus === "paid" ? "Paid" : `Unpaid $${item.totalPrice || 0}`}
                   status={item.status}
-                  actions={[{ 
-                    label: "Cancel Booking", 
-                    type: "danger", 
-                    onPress: () => handleCancelBooking(item._id) 
-                  }]} 
-                />
-              );
-            })}
-
-            <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Past & Cancelled Bookings</Text>
-            {pastBookings.length === 0 ? (
-              <Text style={[styles.emptyText, { color: palette.textSecondary }]}>No past bookings.</Text>
-            ) : null}
-            {pastBookings.map((item) => {
-              const dateStr = item.slotId?.date ? new Date(item.slotId.date).toDateString() : "";
-              return (
-                <BookingCard 
-                  key={item._id} 
-                  title={item.courtId?.name || "Court"} 
-                  subtitle={dateStr}
-                  time={`${item.slotId?.startTime || ""} - ${item.slotId?.endTime || ""}`}
-                  amount="Paid"
-                  status={item.status}
-                  actions={[]} 
+                  imageUrl={Array.isArray(item.courtId?.images) ? item.courtId.images[0] || "" : ""}
+                  actions={
+                    [
+                      ...(canPay
+                        ? [{ label: payLabel, onPress: () => handleConfirmPayment(item._id) }]
+                        : []),
+                      ...(canCancel
+                        ? [{ label: "Cancel Booking", type: "danger", onPress: () => handleCancelBooking(item._id) }]
+                        : []),
+                    ]
+                  } 
                 />
               );
             })}
           </>
         )}
       </ScreenContainer>
-      <TabBar tabs={["Home", "Search", "Bookings", "Profile"]} active="Bookings" onTabPress={onTabPress} />
+      <TabBar tabs={["Home", "Bookings", "Profile"]} active="Bookings" onTabPress={onTabPress} />
     </View>
   );
 }

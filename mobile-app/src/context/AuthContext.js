@@ -11,7 +11,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const loadSession = async () => {
       try {
-        const session = await getCurrentSession();
+        const session = await getCurrentSession({ enforceRemember: true });
         if (session) {
           setUser(session.user);
           setToken(session.token);

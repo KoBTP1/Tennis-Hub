@@ -56,6 +56,7 @@ export async function loginUser({ email, password, rememberMe = false }) {
       user: response.data.user,
     };
 
+    // Always persist session for current app runtime; bootstrap controls restore by remember flag.
     await AsyncStorage.multiSet([
       [SESSION_STORAGE_KEY, JSON.stringify(session)],
       [REMEMBER_ME_STORAGE_KEY, rememberMe ? "true" : "false"],
@@ -67,7 +68,16 @@ export async function loginUser({ email, password, rememberMe = false }) {
   }
 }
 
-export async function getCurrentSession() {
+export async function getCurrentSession(options = {}) {
+  const { enforceRemember = false } = options;
+  if (enforceRemember) {
+    const rememberRaw = await AsyncStorage.getItem(REMEMBER_ME_STORAGE_KEY);
+    if (rememberRaw !== "true") {
+      await AsyncStorage.removeItem(SESSION_STORAGE_KEY);
+      return null;
+    }
+  }
+
   const rawSession = await AsyncStorage.getItem(SESSION_STORAGE_KEY);
   if (!rawSession) {
     return null;
@@ -130,5 +140,29 @@ export async function updateMyProfile(payload) {
     return response.data;
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Unable to update profile."));
+  }
+}
+
+export async function requestPasswordReset(email) {
+  try {
+    const response = await axios.post(`${AUTH_ENDPOINT}/forgot-password`, {
+      email: normalizeEmail(email),
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to request password reset."));
+  }
+}
+
+export async function submitPasswordReset({ token, newPassword, confirmPassword }) {
+  try {
+    const response = await axios.post(`${AUTH_ENDPOINT}/reset-password`, {
+      token,
+      newPassword,
+      confirmPassword,
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to reset password."));
   }
 }

@@ -18,6 +18,20 @@ export async function getCourts() {
   return response.data;
 }
 
+export async function searchCourts({ keyword = "", location = "", page = 1, limit = 20 } = {}) {
+  const headers = await getAuthHeaders();
+  const response = await axios.get(COURTS_ENDPOINT, {
+    headers,
+    params: {
+      keyword: keyword.trim(),
+      location: location.trim(),
+      page,
+      limit,
+    },
+  });
+  return response.data;
+}
+
 export async function getCourtDetail(id) {
   const headers = await getAuthHeaders();
   const response = await axios.get(`${COURTS_ENDPOINT}/${id}`, { headers });

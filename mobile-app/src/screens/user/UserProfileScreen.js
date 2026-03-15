@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import AppHeader from "../../components/AppHeader";
 import Card from "../../components/Card";
 import GradientBackground from "../../components/GradientBackground";
@@ -9,6 +9,7 @@ import TabBar from "../../components/TabBar";
 import { useTheme } from "../../context/ThemeContext";
 import { colors } from "../../styles/theme";
 import { useAuth } from "../../context/AuthContext";
+import { getMyBookings } from "../../services/bookingService";
 
 const menuItems = [
   { key: "edit-profile", label: "Edit Profile" },
@@ -40,7 +41,48 @@ export default function UserProfileScreen({ onTabPress, onNavigate }) {
   const { user, logout } = useAuth();
   const { isDarkMode } = useTheme();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [bookingStats, setBookingStats] = useState({
+    total: 0,
+    upcoming: 0,
+    cancelled: 0,
+  });
   const palette = getPalette(isDarkMode);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadStats = async () => {
+      try {
+        setIsLoadingStats(true);
+        const response = await getMyBookings();
+        const items = Array.isArray(response?.data) ? response.data : [];
+        const total = items.length;
+        const upcoming = items.filter((item) => item.status === "confirmed" || item.status === "pending").length;
+        const cancelled = items.filter((item) => item.status === "cancelled").length;
+
+        if (!mounted) {
+          return;
+        }
+
+        setBookingStats({ total, upcoming, cancelled });
+      } catch {
+        if (!mounted) {
+          return;
+        }
+        setBookingStats({ total: 0, upcoming: 0, cancelled: 0 });
+      } finally {
+        if (mounted) {
+          setIsLoadingStats(false);
+        }
+      }
+    };
+
+    loadStats();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleLogout = async () => {
     if (isLoggingOut) {
@@ -83,18 +125,19 @@ export default function UserProfileScreen({ onTabPress, onNavigate }) {
 
         <View style={styles.statsRow}>
           <Card style={[styles.statCard, { backgroundColor: palette.card }]}>
-            <Text style={styles.statValue}>12</Text>
-            <Text style={[styles.statLabel, { color: palette.textSecondary }]}>Bookings</Text>
+            <Text style={styles.statValue}>{bookingStats.total}</Text>
+            <Text style={[styles.statLabel, { color: palette.textSecondary }]}>Total Bookings</Text>
           </Card>
           <Card style={[styles.statCard, { backgroundColor: palette.card }]}>
-            <Text style={styles.statValue}>8</Text>
-            <Text style={[styles.statLabel, { color: palette.textSecondary }]}>Reviews</Text>
+            <Text style={styles.statValue}>{bookingStats.upcoming}</Text>
+            <Text style={[styles.statLabel, { color: palette.textSecondary }]}>Upcoming</Text>
           </Card>
           <Card style={[styles.statCard, { backgroundColor: palette.card }]}>
-            <Text style={styles.statValue}>5</Text>
-            <Text style={[styles.statLabel, { color: palette.textSecondary }]}>Favorites</Text>
+            <Text style={styles.statValue}>{bookingStats.cancelled}</Text>
+            <Text style={[styles.statLabel, { color: palette.textSecondary }]}>Cancelled</Text>
           </Card>
         </View>
+        {isLoadingStats ? <ActivityIndicator size="small" color={colors.info} /> : null}
 
         <Card style={[styles.menuList, { backgroundColor: palette.card }]}>
           {menuItems.map((item, index) => (
@@ -120,7 +163,7 @@ export default function UserProfileScreen({ onTabPress, onNavigate }) {
           textStyle={styles.logoutButtonText}
         />
       </ScreenContainer>
-      <TabBar tabs={["Home", "Search", "Bookings", "Profile"]} active="Profile" onTabPress={onTabPress} />
+      <TabBar tabs={["Home", "Bookings", "Profile"]} active="Profile" onTabPress={onTabPress} />
     </View>
   );
 }

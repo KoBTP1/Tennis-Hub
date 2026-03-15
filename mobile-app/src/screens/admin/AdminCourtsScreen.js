@@ -66,6 +66,7 @@ export default function AdminCourtsScreen({ onNavigate }) {
       { key: "approved", label: "Approved" },
       { key: "pending", label: "Pending" },
       { key: "suspended", label: "Suspended" },
+      { key: "rejected", label: "Rejected" },
     ],
     []
   );
@@ -165,6 +166,12 @@ export default function AdminCourtsScreen({ onNavigate }) {
                     type: "danger",
                     disabled: court.status === "suspended",
                     onPress: () => handleUpdateStatus(court, "suspended"),
+                  },
+                  {
+                    label: "Reject",
+                    type: "danger",
+                    disabled: court.status === "rejected",
+                    onPress: () => handleUpdateStatus(court, "rejected"),
                   },
                 ]}
               />

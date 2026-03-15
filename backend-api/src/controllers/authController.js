@@ -1,12 +1,15 @@
 const authService = require("../services/authService");
+const MIN_PASSWORD_LENGTH = 8;
 
 function validateEmail(email) {
-  return /\S+@\S+\.\S+/.test(email);
+  const normalized = String(email || "").trim();
+  // Tight enough for API validation while keeping common valid emails compatible.
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(normalized);
 }
 
 async function register(req, res, next) {
   try {
-    const { name, email, password, confirmPassword, phone = "", role = "player" } = req.body;
+    const { name, email, password, confirmPassword, phone = "" } = req.body;
 
     if (!name || !email || !password || !confirmPassword) {
       return res.status(400).json({ message: "name, email, password, confirmPassword are required." });
@@ -16,15 +19,20 @@ async function register(req, res, next) {
       return res.status(400).json({ message: "Invalid email format." });
     }
 
-    if (password.length < 6) {
-      return res.status(400).json({ message: "Password must be at least 6 characters." });
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      return res.status(400).json({ message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` });
     }
 
     if (password !== confirmPassword) {
       return res.status(400).json({ message: "Confirm password does not match." });
     }
 
-    const result = await authService.register({ name, email, password, phone, role });
+    const normalizedPhone = normalizePhone(phone);
+    if (phone !== undefined && !isValidPhone(normalizedPhone)) {
+      return res.status(400).json({ message: "Phone must be 9-15 digits and may start with '+'." });
+    }
+
+    const result = await authService.register({ name, email, password, phone: normalizedPhone, role: "player" });
     return res.status(201).json(result);
   } catch (error) {
     return next(error);
@@ -91,8 +99,10 @@ async function updateMe(req, res, next) {
       if (!currentPassword) {
         return res.status(400).json({ message: "Current password is required to change password." });
       }
-      if (String(newPassword).trim().length < 6) {
-        return res.status(400).json({ message: "New password must be at least 6 characters." });
+      if (String(newPassword).trim().length < MIN_PASSWORD_LENGTH) {
+        return res
+          .status(400)
+          .json({ message: `New password must be at least ${MIN_PASSWORD_LENGTH} characters.` });
       }
     }
 
@@ -113,9 +123,50 @@ async function updateMe(req, res, next) {
   }
 }
 
+async function forgotPassword(req, res, next) {
+  try {
+    const { email } = req.body || {};
+    if (!email || !validateEmail(email)) {
+      return res.status(400).json({ message: "Valid email is required." });
+    }
+
+    const result = await authService.requestPasswordReset(email);
+    return res.status(200).json(result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function resetPassword(req, res, next) {
+  try {
+    const { token, newPassword, confirmPassword } = req.body || {};
+    if (!token || !newPassword || !confirmPassword) {
+      return res.status(400).json({ message: "token, newPassword and confirmPassword are required." });
+    }
+    if (String(newPassword).trim().length < MIN_PASSWORD_LENGTH) {
+      return res
+        .status(400)
+        .json({ message: `New password must be at least ${MIN_PASSWORD_LENGTH} characters.` });
+    }
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ message: "Confirm password does not match." });
+    }
+
+    await authService.resetPassword({ token, newPassword });
+    return res.status(200).json({
+      success: true,
+      message: "Password has been reset successfully.",
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   register,
   login,
   getMe,
   updateMe,
+  forgotPassword,
+  resetPassword,
 };

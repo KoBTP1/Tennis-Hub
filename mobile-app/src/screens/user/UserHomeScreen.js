@@ -1,17 +1,13 @@
-import React from "react";
-import { KeyboardAvoidingView, Platform, StatusBar, StyleSheet, Text, TextInput, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, KeyboardAvoidingView, Platform, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Card from "../../components/Card";
 import ScreenContainer from "../../components/ScreenContainer";
 import TabBar from "../../components/TabBar";
 import { useTheme } from "../../context/ThemeContext";
+import { searchCourts } from "../../services/courtService";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, radius } from "../../styles/theme";
-
-const nearbyCourts = [
-  { name: "Downtown Tennis Center", location: "Downtown", price: "$25/hr", distance: "0.5 km", surface: "Hard Court", rating: "4.8", reviews: 124 },
-  { name: "Sunrise Sports Club", location: "Eastside", price: "$30/hr", distance: "1.2 km", surface: "Clay Court", rating: "4.9", reviews: 89 },
-];
 
 function getPalette(isDarkMode) {
   if (isDarkMode) {
@@ -37,10 +33,50 @@ function getPalette(isDarkMode) {
   };
 }
 
-export default function UserHomeScreen({ onTabPress }) {
+export default function UserHomeScreen({ onTabPress, onOpenCourt }) {
   const { isDarkMode, theme } = useTheme();
   const topInset = Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0;
   const palette = getPalette(isDarkMode);
+  const [courts, setCourts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchKeyword, setSearchKeyword] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadCourts = async () => {
+      try {
+        setIsLoading(true);
+        const response = await searchCourts({
+          keyword: searchKeyword,
+          page: 1,
+          limit: 50,
+        });
+        if (!mounted) {
+          return;
+        }
+        setCourts(Array.isArray(response?.data) ? response.data : []);
+      } catch {
+        if (!mounted) {
+          return;
+        }
+        setCourts([]);
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    const timer = setTimeout(() => {
+      loadCourts();
+    }, 250);
+
+    return () => {
+      mounted = false;
+      clearTimeout(timer);
+    };
+  }, [searchKeyword]);
 
   return (
     <View style={[styles.root, { backgroundColor: palette.background }]}>
@@ -60,46 +96,57 @@ export default function UserHomeScreen({ onTabPress }) {
             <Text style={styles.heroSub}>Book the perfect tennis court near you</Text>
           </LinearGradient>
 
-        <Card style={[styles.searchCard, { backgroundColor: palette.card }]}>
-          <Ionicons name="search-outline" size={20} color="#9ca3af" />
-          <TextInput
-            placeholder="Search courts by location..."
-            placeholderTextColor="#9ca3af"
-            style={[styles.searchInput, { color: palette.textPrimary }]}
-          />
-        </Card>
+          <Card style={[styles.searchCard, { backgroundColor: palette.card }]}>
+            <Ionicons name="search-outline" size={20} color="#9ca3af" />
+            <TextInput
+              value={searchKeyword}
+              onChangeText={setSearchKeyword}
+              placeholder="Search courts by name or location..."
+              placeholderTextColor="#9ca3af"
+              style={[styles.searchInput, { color: palette.textPrimary }]}
+            />
+          </Card>
 
-        <View style={styles.sectionRow}>
-          <View style={styles.sectionTitleWrap}>
-            <Ionicons name="location-outline" size={18} color={colors.success} />
-            <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Nearby Courts</Text>
+          <View style={styles.sectionRow}>
+            <View style={styles.sectionTitleWrap}>
+              <Ionicons name="location-outline" size={18} color={colors.success} />
+              <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Nearby Courts</Text>
+            </View>
+            <Text style={styles.link}>{courts.length} courts</Text>
           </View>
-          <Text style={styles.link}>View All</Text>
-        </View>
 
-          {nearbyCourts.map((court) => (
-            <Card key={court.name} style={[styles.courtCard, { backgroundColor: palette.card }]}>
-            <View style={styles.pricePill}>
-              <Text style={styles.pricePillText}>{court.price}</Text>
-            </View>
-            <View style={[styles.courtImageWrap, { backgroundColor: palette.imageBg }]}>
-              <Ionicons name="image-outline" size={66} color="#9ca3af" />
-            </View>
-            <View style={styles.courtInfo}>
-              <Text style={[styles.courtTitle, { color: palette.textPrimary }]}>{court.name}</Text>
-              <Text style={[styles.courtMeta, { color: palette.textSecondary }]}>{court.location}</Text>
-              <View style={styles.courtMetaRow}>
-                <Text style={styles.rating}>★ {court.rating}</Text>
-                <Text style={[styles.reviewCount, { color: palette.textSecondary }]}>({court.reviews})</Text>
-                <Text style={styles.distance}>{court.distance}</Text>
-                <Text style={[styles.surface, { color: palette.textSecondary }]}>{court.surface}</Text>
-              </View>
-            </View>
-            </Card>
-          ))}
+          {isLoading ? <ActivityIndicator size="small" color={theme.info} /> : null}
+          {!isLoading && courts.length === 0 ? (
+            <Text style={[styles.emptyText, { color: palette.textSecondary }]}>No courts found.</Text>
+          ) : null}
+          {!isLoading &&
+            courts.map((court) => (
+              <TouchableOpacity key={court._id || court.id || court.name} activeOpacity={0.9} onPress={() => onOpenCourt?.(court._id || court.id)}>
+                <Card style={[styles.courtCard, { backgroundColor: palette.card }]}>
+                  <View style={styles.pricePill}>
+                    <Text style={styles.pricePillText}>${court.pricePerHour || 0}/hr</Text>
+                  </View>
+                  <View style={[styles.courtImageWrap, { backgroundColor: palette.imageBg }]}>
+                    {Array.isArray(court.images) && court.images[0] ? (
+                      <Image source={{ uri: court.images[0] }} style={styles.courtImage} resizeMode="cover" />
+                    ) : (
+                      <Ionicons name="image-outline" size={66} color="#9ca3af" />
+                    )}
+                  </View>
+                  <View style={styles.courtInfo}>
+                    <Text style={[styles.courtTitle, { color: palette.textPrimary }]}>{court.name}</Text>
+                    <Text style={[styles.courtMeta, { color: palette.textSecondary }]}>{court.location}</Text>
+                    <View style={styles.courtMetaRow}>
+                      <Text style={[styles.distance, { marginLeft: 0 }]}>${court.pricePerHour || 0}/hour</Text>
+                      <Text style={[styles.surface, { color: palette.textSecondary }]}>{court.status || "approved"}</Text>
+                    </View>
+                  </View>
+                </Card>
+              </TouchableOpacity>
+            ))}
         </ScreenContainer>
       </KeyboardAvoidingView>
-      <TabBar tabs={["Home", "Search", "Bookings", "Profile"]} active="Home" onTabPress={onTabPress} />
+      <TabBar tabs={["Home", "Bookings", "Profile"]} active="Home" onTabPress={onTabPress} />
     </View>
   );
 }
@@ -120,6 +167,7 @@ const styles = StyleSheet.create({
   sectionTitleWrap: { flexDirection: "row", alignItems: "center", gap: 6 },
   sectionTitle: { fontSize: 34, fontWeight: "800", color: colors.textPrimary },
   link: { color: colors.success, fontWeight: "700", fontSize: 16 },
+  emptyText: { textAlign: "center", marginTop: 4, marginBottom: 8, fontSize: 15 },
   courtCard: { marginBottom: 2, padding: 0, overflow: "hidden" },
   pricePill: {
     position: "absolute",
@@ -138,12 +186,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  courtImage: { width: "100%", height: "100%" },
   courtInfo: { paddingHorizontal: 14, paddingVertical: 10 },
   courtTitle: { fontSize: 34 / 2, fontWeight: "800", color: "#111827" },
   courtMeta: { color: colors.textSecondary, marginTop: 4, fontSize: 16 },
   courtMetaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },
-  rating: { color: "#f59e0b", fontWeight: "700", fontSize: 16 },
-  reviewCount: { color: colors.textSecondary, fontSize: 14 },
   distance: { marginLeft: "auto", color: colors.success, fontSize: 16, fontWeight: "600" },
   surface: { color: "#6b7280", fontSize: 15 },
 });
