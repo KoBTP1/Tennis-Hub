@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import AppHeader from "../../components/AppHeader";
 import Card from "../../components/Card";
+import RoleTopBar from "../../components/RoleTopBar";
 import ScreenContainer from "../../components/ScreenContainer";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -107,7 +107,7 @@ export default function AdminUsersScreen({ onNavigate }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <AppHeader title="Manage Users" leftText="‹" onLeftPress={() => onNavigate?.("dashboard")} />
+      <RoleTopBar />
       <KeyboardAvoidingView style={styles.keyboardAvoiding} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScreenContainer>
           <Card style={styles.searchCard}>
@@ -124,10 +124,25 @@ export default function AdminUsersScreen({ onNavigate }) {
           {roleFilters.map((role) => (
             <TouchableOpacity
               key={role.key}
-              style={[styles.rolePill, selectedRole === role.key ? styles.roleActive : null]}
+              style={[
+                styles.rolePill,
+                {
+                  backgroundColor: theme.mode === "dark" ? theme.inputBackground : colors.white,
+                  borderColor: theme.border,
+                },
+                selectedRole === role.key ? styles.roleActive : null,
+              ]}
               onPress={() => setSelectedRole(role.key)}
             >
-              <Text style={[styles.roleText, selectedRole === role.key ? styles.roleActiveText : null]}>{role.label}</Text>
+              <Text
+                style={[
+                  styles.roleText,
+                  { color: theme.mode === "dark" ? colors.white : colors.textPrimary },
+                  selectedRole === role.key ? styles.roleActiveText : null,
+                ]}
+              >
+                {role.label}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -135,21 +150,21 @@ export default function AdminUsersScreen({ onNavigate }) {
         <View style={styles.statRow}>
           <Card style={styles.statCard}>
             <Text style={styles.statValue}>{stats.byRole.player || 0}</Text>
-            <Text style={styles.statLabel}>Players</Text>
+            <Text style={[styles.statLabel, { color: theme.mode === "dark" ? colors.white : colors.textSecondary }]}>Players</Text>
           </Card>
           <Card style={styles.statCard}>
             <Text style={styles.statValue}>{stats.byRole.owner || 0}</Text>
-            <Text style={styles.statLabel}>Owners</Text>
+            <Text style={[styles.statLabel, { color: theme.mode === "dark" ? colors.white : colors.textSecondary }]}>Owners</Text>
           </Card>
           <Card style={styles.statCard}>
             <Text style={styles.statValue}>{stats.byRole.admin || 0}</Text>
-            <Text style={styles.statLabel}>Admins</Text>
+            <Text style={[styles.statLabel, { color: theme.mode === "dark" ? colors.white : colors.textSecondary }]}>Admins</Text>
           </Card>
         </View>
 
-        <Text style={styles.count}>{totalUsers} users found</Text>
+        <Text style={[styles.count, { color: theme.mode === "dark" ? colors.white : colors.textSecondary }]}>{totalUsers} users found</Text>
         {isLoading ? <ActivityIndicator size="large" color={colors.info} style={styles.loader} /> : null}
-        {!isLoading && users.length === 0 ? <Text style={styles.empty}>No users found.</Text> : null}
+        {!isLoading && users.length === 0 ? <Text style={[styles.empty, { color: theme.mode === "dark" ? colors.white : colors.textSecondary }]}>No users found.</Text> : null}
           {!isLoading &&
             users.map((user) => {
               const isBlocked = user.status === "blocked";
@@ -157,13 +172,13 @@ export default function AdminUsersScreen({ onNavigate }) {
 
               return (
                 <Card key={user.id}>
-                  <Text style={styles.name}>{user.name}</Text>
+                  <Text style={[styles.name, { color: theme.mode === "dark" ? colors.white : colors.textPrimary }]}>{user.name}</Text>
                   <Text style={[styles.badge, isBlocked ? styles.badgeBlocked : styles.badgeActive]}>
                     {user.role} · {user.status}
                   </Text>
-                  <Text style={styles.meta}>{user.email}</Text>
-                  <Text style={styles.meta}>{user.phone || "-"}</Text>
-                  <Text style={styles.meta}>Joined: {formatDate(user.joinedAt)}</Text>
+                  <Text style={[styles.meta, { color: theme.mode === "dark" ? colors.white : colors.textSecondary }]}>{user.email}</Text>
+                  <Text style={[styles.meta, { color: theme.mode === "dark" ? colors.white : colors.textSecondary }]}>{user.phone || "-"}</Text>
+                  <Text style={[styles.meta, { color: theme.mode === "dark" ? colors.white : colors.textSecondary }]}>Joined: {formatDate(user.joinedAt)}</Text>
                   <View style={styles.actionRow}>
                     <TouchableOpacity
                       style={[styles.activate, (!isBlocked || isSelf) && styles.actionDisabled]}
@@ -219,9 +234,9 @@ const styles = StyleSheet.create({
   badgeBlocked: { backgroundColor: colors.dangerSoft, color: colors.danger },
   meta: { color: colors.textSecondary, marginTop: 4 },
   actionRow: { flexDirection: "row", gap: 10, marginTop: 10 },
-  activate: { flex: 1, borderRadius: radius.sm, backgroundColor: colors.successSoft, alignItems: "center", paddingVertical: 9 },
-  activateText: { color: colors.success, fontWeight: "700" },
-  suspend: { flex: 1, borderRadius: radius.sm, backgroundColor: colors.dangerSoft, alignItems: "center", paddingVertical: 9 },
-  suspendText: { color: colors.danger, fontWeight: "700" },
+  activate: { flex: 1, borderRadius: radius.sm, backgroundColor: colors.success, alignItems: "center", paddingVertical: 9 },
+  activateText: { color: colors.white, fontWeight: "700" },
+  suspend: { flex: 1, borderRadius: radius.sm, backgroundColor: colors.danger, alignItems: "center", paddingVertical: 9 },
+  suspendText: { color: colors.white, fontWeight: "700" },
   actionDisabled: { opacity: 0.45 },
 });

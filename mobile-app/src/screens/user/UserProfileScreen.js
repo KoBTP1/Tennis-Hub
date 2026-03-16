@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import AppHeader from "../../components/AppHeader";
 import Card from "../../components/Card";
 import GradientBackground from "../../components/GradientBackground";
 import GradientButton from "../../components/GradientButton";
+import RoleTopBar from "../../components/RoleTopBar";
 import ScreenContainer from "../../components/ScreenContainer";
 import TabBar from "../../components/TabBar";
 import { useTheme } from "../../context/ThemeContext";
@@ -108,7 +108,7 @@ export default function UserProfileScreen({ onTabPress, onNavigate }) {
 
   return (
     <View style={[styles.root, { backgroundColor: palette.background }]}>
-      <AppHeader title="Profile" />
+      <RoleTopBar />
       <ScreenContainer backgroundColor={palette.background}>
         <GradientBackground style={styles.profileCard}>
           <View style={styles.avatar}>

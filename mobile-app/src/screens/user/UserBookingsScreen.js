@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity } from "react-native";
-import AppHeader from "../../components/AppHeader";
+import { StyleSheet, Text, View, ActivityIndicator, Alert, Platform, TouchableOpacity } from "react-native";
 import BookingCard from "../../components/BookingCard";
 import Card from "../../components/Card";
+import RoleTopBar from "../../components/RoleTopBar";
 import ScreenContainer from "../../components/ScreenContainer";
 import TabBar from "../../components/TabBar";
 import { useTheme } from "../../context/ThemeContext";
 import { colors, radius } from "../../styles/theme";
 import { getMyBookings, cancelBooking } from "../../services/bookingService";
 import { confirmMockPayment } from "../../services/paymentService";
+import { formatVND } from "../../utils/currency";
+import { normalizeImageUrl } from "../../utils/imageUrl";
 
 function getPalette(isDarkMode) {
   if (isDarkMode) {
@@ -58,6 +60,25 @@ export default function UserBookingsScreen({ onTabPress }) {
   }, []);
 
   const handleCancelBooking = async (id) => {
+    const performCancel = async () => {
+      try {
+        await cancelBooking(id);
+        Alert.alert("Success", "Booking cancelled successfully.");
+        await fetchBookings();
+      } catch (err) {
+        Alert.alert("Error", err.message || "Failed to cancel booking.");
+      }
+    };
+
+    if (Platform.OS === "web") {
+      const accepted = globalThis.confirm?.("Are you sure you want to cancel this booking?");
+      if (!accepted) {
+        return;
+      }
+      await performCancel();
+      return;
+    }
+
     Alert.alert(
       "Cancel Booking",
       "Are you sure you want to cancel this booking?",
@@ -66,15 +87,9 @@ export default function UserBookingsScreen({ onTabPress }) {
         { 
           text: "Yes", 
           style: "destructive",
-          onPress: async () => {
-            try {
-              await cancelBooking(id);
-              Alert.alert("Success", "Booking cancelled successfully.");
-              fetchBookings();
-            } catch (err) {
-              Alert.alert("Error", err.message || "Failed to cancel booking.");
-            }
-          }
+          onPress: () => {
+            void performCancel();
+          },
         }
       ]
     );
@@ -100,7 +115,7 @@ export default function UserBookingsScreen({ onTabPress }) {
 
   return (
     <View style={[styles.root, { backgroundColor: palette.background }]}>
-      <AppHeader title="My Bookings" />
+      <RoleTopBar />
       <ScreenContainer backgroundColor={palette.background}>
         <Card style={[styles.tabFilter, { backgroundColor: palette.card }]}>
           {["All", "Upcoming", "Past"].map((tab) => (
@@ -135,9 +150,9 @@ export default function UserBookingsScreen({ onTabPress }) {
                   title={item.courtId?.name || "Court"} 
                   subtitle={dateStr}
                   time={`${item.slotId?.startTime || ""} - ${item.slotId?.endTime || ""}`}
-                  amount={item.paymentStatus === "paid" ? "Paid" : `Unpaid $${item.totalPrice || 0}`}
+                  amount={item.paymentStatus === "paid" ? `Đã thanh toán ${formatVND(item.totalPrice || 0)}` : `Chưa thanh toán ${formatVND(item.totalPrice || 0)}`}
                   status={item.status}
-                  imageUrl={Array.isArray(item.courtId?.images) ? item.courtId.images[0] || "" : ""}
+                  imageUrl={normalizeImageUrl(Array.isArray(item.courtId?.images) ? item.courtId.images[0] || "" : "")}
                   actions={
                     [
                       ...(canPay

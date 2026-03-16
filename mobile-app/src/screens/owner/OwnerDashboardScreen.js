@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import AppHeader from "../../components/AppHeader";
 import Card from "../../components/Card";
 import GradientBackground from "../../components/GradientBackground";
 import GradientButton from "../../components/GradientButton";
+import RoleTopBar from "../../components/RoleTopBar";
 import ScreenContainer from "../../components/ScreenContainer";
 import StatCard from "../../components/StatCard";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { getOwnerDashboard } from "../../services/ownerService";
 import { colors } from "../../styles/theme";
+import { formatVND } from "../../utils/currency";
 
 export default function OwnerDashboardScreen({ onNavigate }) {
   const { user, logout } = useAuth();
@@ -64,7 +65,7 @@ export default function OwnerDashboardScreen({ onNavigate }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <AppHeader title="Owner Dashboard" />
+      <RoleTopBar />
       <ScreenContainer>
         <GradientBackground style={styles.hero}>
           <View style={styles.avatar}>
@@ -78,31 +79,37 @@ export default function OwnerDashboardScreen({ onNavigate }) {
         </GradientBackground>
 
         <View style={styles.gridRow}>
-          <StatCard value={dashboard.totals.courts} label="My Courts" accent={colors.success} />
-          <StatCard value={dashboard.totals.activeBookings} label="Active Bookings" accent={colors.info} />
+          <StatCard value={dashboard.totals.courts} label="My Courts" accent={colors.success} iconName="tennisball-outline" />
+          <StatCard value={dashboard.totals.activeBookings} label="Active Bookings" accent={colors.info} iconName="calendar-clear-outline" />
         </View>
         <View style={styles.gridRow}>
-          <StatCard value={`$${dashboard.totals.revenue}`} label="Total Revenue" accent={colors.success} />
-          <StatCard value={dashboard.totals.bookings} label="Total Bookings" accent={colors.info} />
+          <StatCard value={formatVND(dashboard.totals.revenue)} label="Total Revenue" accent={colors.success} iconName="cash-outline" />
+          <StatCard value={dashboard.totals.bookings} label="Total Bookings" accent={colors.info} iconName="receipt-outline" />
         </View>
         {isLoading ? <ActivityIndicator size="small" color={colors.info} /> : null}
 
         <Text style={[styles.section, { color: theme.text }]}>Quick Actions</Text>
-        <TouchableOpacity activeOpacity={0.85} onPress={() => onNavigate?.("Courts")}>
+        <TouchableOpacity activeOpacity={0.85} onPress={() => onNavigate?.("Manage")}>
           <Card style={styles.actionCard}>
             <Text style={[styles.actionText, { color: theme.text }]}>Add New Court</Text>
-            <Text style={styles.arrow}>→</Text>
-          </Card>
-        </TouchableOpacity>
-        <TouchableOpacity activeOpacity={0.85} onPress={() => onNavigate?.("Schedule")}>
-          <Card style={styles.actionCard}>
-            <Text style={[styles.actionText, { color: theme.text }]}>Manage Schedule</Text>
             <Text style={styles.arrow}>→</Text>
           </Card>
         </TouchableOpacity>
         <TouchableOpacity activeOpacity={0.85} onPress={() => onNavigate?.("Bookings")}>
           <Card style={styles.actionCard}>
             <Text style={[styles.actionText, { color: theme.text }]}>View Bookings</Text>
+            <Text style={styles.arrow}>→</Text>
+          </Card>
+        </TouchableOpacity>
+        <TouchableOpacity activeOpacity={0.85} onPress={() => onNavigate?.("settings")}>
+          <Card style={styles.actionCard}>
+            <Text style={[styles.actionText, { color: theme.text }]}>Settings</Text>
+            <Text style={styles.arrow}>→</Text>
+          </Card>
+        </TouchableOpacity>
+        <TouchableOpacity activeOpacity={0.85} onPress={() => onNavigate?.("edit-profile")}>
+          <Card style={styles.actionCard}>
+            <Text style={[styles.actionText, { color: theme.text }]}>Edit Profile</Text>
             <Text style={styles.arrow}>→</Text>
           </Card>
         </TouchableOpacity>

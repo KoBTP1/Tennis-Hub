@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
-import AppHeader from "../../components/AppHeader";
 import Card from "../../components/Card";
+import RoleTopBar from "../../components/RoleTopBar";
 import ScreenContainer from "../../components/ScreenContainer";
 import { useTheme } from "../../context/ThemeContext";
 import { colors } from "../../styles/theme";
@@ -87,7 +87,7 @@ export default function UserSettingsScreen({ onBack }) {
 
   return (
     <View style={[styles.root, { backgroundColor: palette.background }]}>
-      <AppHeader title="Settings" leftText="‹" onLeftPress={onBack} />
+      <RoleTopBar onBack={onBack} />
       <ScreenContainer backgroundColor={palette.background}>
         <Card style={[styles.card, { backgroundColor: palette.card }]}>
           <View style={styles.settingRow}>

@@ -1,6 +1,7 @@
 const express = require("express");
 const ownerController = require("../controllers/ownerController");
 const { authorizeRoles, protect } = require("../middleware/authMiddleware");
+const { uploadCourtImage } = require("../middleware/uploadMiddleware");
 
 const router = express.Router();
 
@@ -20,5 +21,6 @@ router.delete("/slots/:id", ownerController.deleteSlot);
 
 router.get("/bookings", ownerController.getBookings);
 router.patch("/bookings/:id/status", ownerController.patchBookingStatus);
+router.post("/uploads/image", uploadCourtImage.single("image"), ownerController.uploadImage);
 
 module.exports = router;

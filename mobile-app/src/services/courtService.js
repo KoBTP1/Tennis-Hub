@@ -44,3 +44,9 @@ export async function getCourtSlots(id, date) {
   const response = await axios.get(`${COURTS_ENDPOINT}/${id}/slots`, { headers, params });
   return response.data;
 }
+
+export async function toggleCourtFavorite(id) {
+  const headers = await getAuthHeaders();
+  const response = await axios.post(`${COURTS_ENDPOINT}/${id}/favorite`, {}, { headers });
+  return response.data;
+}

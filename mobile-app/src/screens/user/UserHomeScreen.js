@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View, Image } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Card from "../../components/Card";
+import CourtCard from "../../components/CourtCard";
+import RoleTopBar from "../../components/RoleTopBar";
 import ScreenContainer from "../../components/ScreenContainer";
 import TabBar from "../../components/TabBar";
+import { API_BASE_URL } from "../../config/api";
 import { useTheme } from "../../context/ThemeContext";
-import { searchCourts } from "../../services/courtService";
+import { searchCourts, toggleCourtFavorite } from "../../services/courtService";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, radius } from "../../styles/theme";
-
+import { formatVNDPerHour } from "../../utils/currency";
 function getPalette(isDarkMode) {
   if (isDarkMode) {
     return {
@@ -33,13 +36,31 @@ function getPalette(isDarkMode) {
   };
 }
 
+function resolveCourtImageUrl(inputUrl) {
+  const raw = String(inputUrl || "").trim();
+  if (!raw) {
+    return "";
+  }
+  if (raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("data:image/")) {
+    return raw;
+  }
+  if (raw.startsWith("file://")) {
+    return Platform.OS === "web" ? "" : raw;
+  }
+  const apiOrigin = API_BASE_URL.replace(/\/api\/?$/, "");
+  if (raw.startsWith("/")) {
+    return `${apiOrigin}${raw}`;
+  }
+  return `${apiOrigin}/${raw}`;
+}
+
 export default function UserHomeScreen({ onTabPress, onOpenCourt }) {
   const { isDarkMode, theme } = useTheme();
-  const topInset = Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0;
   const palette = getPalette(isDarkMode);
   const [courts, setCourts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState("");
+  const [favoriteIds, setFavoriteIds] = useState([]);
 
   useEffect(() => {
     let mounted = true;
@@ -55,7 +76,12 @@ export default function UserHomeScreen({ onTabPress, onOpenCourt }) {
         if (!mounted) {
           return;
         }
-        setCourts(Array.isArray(response?.data) ? response.data : []);
+        const list = Array.isArray(response?.data) ? response.data : [];
+        setCourts(list);
+        const nextFavorites = list
+          .filter((item) => Boolean(item?.isFavorited))
+          .map((item) => String(item?._id || item?.id || ""));
+        setFavoriteIds(nextFavorites.filter(Boolean));
       } catch {
         if (!mounted) {
           return;
@@ -80,14 +106,7 @@ export default function UserHomeScreen({ onTabPress, onOpenCourt }) {
 
   return (
     <View style={[styles.root, { backgroundColor: palette.background }]}>
-      <LinearGradient
-        colors={[theme.gradientStart, theme.gradientEnd]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={[styles.header, { paddingTop: 12 + topInset }]}
-      >
-        <Text style={[styles.headerTitle, isDarkMode ? styles.softWhiteText : null]}>Tennis Courts</Text>
-      </LinearGradient>
+      <RoleTopBar />
 
       <KeyboardAvoidingView style={styles.keyboardAvoiding} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScreenContainer contentStyle={styles.content} backgroundColor={palette.background}>
@@ -120,30 +139,50 @@ export default function UserHomeScreen({ onTabPress, onOpenCourt }) {
             <Text style={[styles.emptyText, { color: palette.textSecondary }]}>No courts found.</Text>
           ) : null}
           {!isLoading &&
-            courts.map((court) => (
-              <TouchableOpacity key={court._id || court.id || court.name} activeOpacity={0.9} onPress={() => onOpenCourt?.(court._id || court.id)}>
-                <Card style={[styles.courtCard, { backgroundColor: palette.card }]}>
-                  <View style={styles.pricePill}>
-                    <Text style={styles.pricePillText}>${court.pricePerHour || 0}/hr</Text>
-                  </View>
-                  <View style={[styles.courtImageWrap, { backgroundColor: palette.imageBg }]}>
-                    {Array.isArray(court.images) && court.images[0] ? (
-                      <Image source={{ uri: court.images[0] }} style={styles.courtImage} resizeMode="cover" />
-                    ) : (
-                      <Ionicons name="image-outline" size={66} color="#9ca3af" />
-                    )}
-                  </View>
-                  <View style={styles.courtInfo}>
-                    <Text style={[styles.courtTitle, { color: palette.textPrimary }]}>{court.name}</Text>
-                    <Text style={[styles.courtMeta, { color: palette.textSecondary }]}>{court.location}</Text>
-                    <View style={styles.courtMetaRow}>
-                      <Text style={[styles.distance, { marginLeft: 0 }]}>${court.pricePerHour || 0}/hour</Text>
-                      <Text style={[styles.surface, { color: palette.textSecondary }]}>{court.status || "approved"}</Text>
-                    </View>
-                  </View>
-                </Card>
-              </TouchableOpacity>
-            ))}
+            courts.map((court) => {
+              const courtId = court._id || court.id;
+              const images = Array.isArray(court.images)
+                ? court.images.map((item) => resolveCourtImageUrl(item)).filter(Boolean)
+                : [];
+              const isFavorite = favoriteIds.includes(String(courtId));
+              return (
+                <CourtCard
+                  key={courtId || court.name}
+                  name={court.name}
+                  location={court.location}
+                  mapUrl={court.mapUrl}
+                  price={formatVNDPerHour(court.pricePerHour || 0)}
+                  imageUrl={images[0] || ""}
+                  imageUrls={images}
+                  isFavorite={isFavorite}
+                  onToggleFavorite={async () => {
+                    const id = String(courtId);
+                    const previous = favoriteIds;
+                    const optimistic = previous.includes(id)
+                      ? previous.filter((item) => item !== id)
+                      : [...previous, id];
+                    setFavoriteIds(optimistic);
+                    try {
+                      const response = await toggleCourtFavorite(courtId);
+                      const serverFavorite = Boolean(response?.data?.isFavorited);
+                      setFavoriteIds((prev) => {
+                        if (serverFavorite && !prev.includes(id)) {
+                          return [...prev, id];
+                        }
+                        if (!serverFavorite && prev.includes(id)) {
+                          return prev.filter((item) => item !== id);
+                        }
+                        return prev;
+                      });
+                    } catch {
+                      setFavoriteIds(previous);
+                    }
+                  }}
+                  showPrimaryAction={false}
+                  onPress={() => onOpenCourt?.(courtId)}
+                />
+              );
+            })}
         </ScreenContainer>
       </KeyboardAvoidingView>
       <TabBar tabs={["Home", "Bookings", "Profile"]} active="Home" onTabPress={onTabPress} />
@@ -154,8 +193,6 @@ export default function UserHomeScreen({ onTabPress, onOpenCourt }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   keyboardAvoiding: { flex: 1 },
-  header: { paddingHorizontal: 16, paddingBottom: 12 },
-  headerTitle: { color: colors.white, fontSize: 30, fontWeight: "700" },
   softWhiteText: { color: "#E5E5E5" },
   content: { paddingTop: 12, paddingHorizontal: 12, paddingBottom: 24 },
   hero: { borderRadius: radius.md, padding: 18 },
@@ -168,29 +205,4 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 34, fontWeight: "800", color: colors.textPrimary },
   link: { color: colors.success, fontWeight: "700", fontSize: 16 },
   emptyText: { textAlign: "center", marginTop: 4, marginBottom: 8, fontSize: 15 },
-  courtCard: { marginBottom: 2, padding: 0, overflow: "hidden" },
-  pricePill: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    zIndex: 3,
-    backgroundColor: colors.successSoft,
-    borderRadius: radius.full,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  pricePillText: { color: colors.success, fontWeight: "700", fontSize: 14 },
-  courtImageWrap: {
-    height: 168,
-    backgroundColor: "#ebedf0",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  courtImage: { width: "100%", height: "100%" },
-  courtInfo: { paddingHorizontal: 14, paddingVertical: 10 },
-  courtTitle: { fontSize: 34 / 2, fontWeight: "800", color: "#111827" },
-  courtMeta: { color: colors.textSecondary, marginTop: 4, fontSize: 16 },
-  courtMetaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },
-  distance: { marginLeft: "auto", color: colors.success, fontSize: 16, fontWeight: "600" },
-  surface: { color: "#6b7280", fontSize: 15 },
 });

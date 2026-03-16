@@ -3,6 +3,32 @@ import { API_BASE_URL } from "../config/api";
 import { getCurrentSession } from "./authService";
 
 const OWNER_ENDPOINT = `${API_BASE_URL}/owner`;
+const API_ORIGIN = (() => {
+  try {
+    return new URL(API_BASE_URL).origin;
+  } catch {
+    return API_BASE_URL;
+  }
+})();
+
+function normalizeServerAssetUrl(url) {
+  const raw = String(url || "").trim();
+  if (!raw) {
+    return "";
+  }
+  try {
+    const parsed = new URL(raw);
+    if (parsed.pathname.startsWith("/uploads/")) {
+      const fallback = new URL(API_ORIGIN);
+      parsed.protocol = fallback.protocol;
+      parsed.host = fallback.host;
+      return parsed.toString();
+    }
+    return raw;
+  } catch {
+    return raw;
+  }
+}
 
 async function getAuthHeaders() {
   const session = await getCurrentSession();
@@ -89,4 +115,43 @@ export async function updateOwnerBookingStatus(bookingId, status) {
   const headers = await getAuthHeaders();
   const response = await axios.patch(`${OWNER_ENDPOINT}/bookings/${bookingId}/status`, { status }, { headers });
   return response.data;
+}
+
+export async function uploadOwnerCourtImage(asset) {
+  const headers = await getAuthHeaders();
+  const formData = new FormData();
+  const assetUri = String(asset?.uri || "");
+  const fileName = String(asset?.fileName || "").trim() || `court-${Date.now()}.jpg`;
+  const fileType = String(asset?.mimeType || "").trim() || "image/jpeg";
+
+  if (asset?.file) {
+    formData.append("image", asset.file);
+  } else if (assetUri) {
+    formData.append("image", { uri: assetUri, name: fileName, type: fileType });
+  } else {
+    throw new Error("Selected image is invalid.");
+  }
+
+  const response = await axios.post(`${OWNER_ENDPOINT}/uploads/image`, formData, {
+    headers: {
+      ...headers,
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  const serverUrl = String(response?.data?.data?.url || "").trim();
+  const serverPath = String(response?.data?.data?.path || "").trim();
+  let normalizedUrl = normalizeServerAssetUrl(serverUrl);
+  if (!normalizedUrl && serverPath) {
+    const normalizedPath = serverPath.startsWith("/") ? serverPath : `/${serverPath}`;
+    normalizedUrl = `${API_ORIGIN}${normalizedPath}`;
+  }
+
+  return {
+    ...response.data,
+    data: {
+      ...response.data?.data,
+      url: normalizedUrl,
+    },
+  };
 }

@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import AppHeader from "../../components/AppHeader";
 import Card from "../../components/Card";
 import GradientButton from "../../components/GradientButton";
+import RoleTopBar from "../../components/RoleTopBar";
 import ScreenContainer from "../../components/ScreenContainer";
 import { createOwnerSlot, deleteOwnerSlot, getOwnerCourts, getOwnerSlots, updateOwnerSlot } from "../../services/ownerService";
 import { useTheme } from "../../context/ThemeContext";
@@ -22,7 +22,7 @@ function toMinutes(value) {
   return hour * 60 + minute;
 }
 
-export default function OwnerScheduleScreen({ onTabPress }) {
+export default function OwnerScheduleScreen({ embedded = false }) {
   const { theme } = useTheme();
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const timeOptions = useMemo(() => {
@@ -233,7 +233,7 @@ export default function OwnerScheduleScreen({ onTabPress }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <AppHeader title="Manage Schedule" leftText="‹" onLeftPress={() => onTabPress?.("Home")} />
+      {embedded ? null : <RoleTopBar />}
       <KeyboardAvoidingView style={styles.keyboardAvoiding} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScreenContainer>
           <Text style={[styles.label, { color: theme.textSecondary }]}>Select Court</Text>

@@ -7,19 +7,23 @@ import { radius } from "../styles/theme";
 const iconByTab = {
   Home: "home-outline",
   Search: "search-outline",
+  Manage: "construct-outline",
   Courts: "tennisball-outline",
   Schedule: "time-outline",
   Bookings: "calendar-outline",
   Profile: "person-outline",
+  Settings: "settings-outline",
 };
 
 const activeIconByTab = {
   Home: "home",
   Search: "search",
+  Manage: "construct",
   Courts: "tennisball",
   Schedule: "time",
   Bookings: "calendar",
   Profile: "person",
+  Settings: "settings",
 };
 
 export default function TabBar({ tabs, active, onTabPress }) {

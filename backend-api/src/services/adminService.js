@@ -1,6 +1,7 @@
 const Booking = require("../models/Booking");
 const Court = require("../models/Court");
 const User = require("../models/User");
+const notificationService = require("./notificationService");
 const { escapeRegex } = require("../utils/requestValidation");
 
 function parsePage(value, fallback) {
@@ -53,6 +54,8 @@ function sanitizeCourt(court) {
     location: court.location,
     ownerName: court.ownerName || "",
     pricePerHour: court.pricePerHour || 0,
+    mapUrl: court.mapUrl || "",
+    images: Array.isArray(court.images) ? court.images : [],
     rating: court.rating || 0,
     reviewsCount: court.reviewsCount || 0,
     status: court.status,
@@ -199,8 +202,26 @@ async function updateCourtStatus({ courtId, status }) {
     throw error;
   }
 
+  const previousStatus = court.status;
   court.status = status;
   await court.save();
+  if (status !== previousStatus && ["approved", "rejected", "suspended"].includes(status)) {
+    const statusMessageMap = {
+      approved: "approved",
+      rejected: "rejected",
+      suspended: "suspended",
+    };
+    await notificationService.createNotification({
+      recipientId: court.ownerId,
+      type: "court_status_changed",
+      title: "Court status updated",
+      message: `Your court "${court.name}" was ${statusMessageMap[status]} by admin.`,
+      metadata: {
+        courtId: court._id.toString(),
+        status,
+      },
+    });
+  }
   return sanitizeCourt(court);
 }
 

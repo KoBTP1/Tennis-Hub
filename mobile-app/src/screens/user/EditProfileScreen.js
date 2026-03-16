@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from "react-native";
-import AppHeader from "../../components/AppHeader";
 import Card from "../../components/Card";
 import GradientButton from "../../components/GradientButton";
+import RoleTopBar from "../../components/RoleTopBar";
 import ScreenContainer from "../../components/ScreenContainer";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -93,7 +93,7 @@ export default function EditProfileScreen({ onBack }) {
 
   return (
     <View style={[styles.root, { backgroundColor: palette.background }]}>
-      <AppHeader title="Edit Profile" leftText="‹" onLeftPress={onBack} />
+      <RoleTopBar onBack={onBack} />
       <KeyboardAvoidingView style={styles.keyboardAvoiding} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScreenContainer backgroundColor={palette.background}>
           <Card style={[styles.card, { backgroundColor: palette.card }]}>
