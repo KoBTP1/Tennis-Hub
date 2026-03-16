@@ -1,14 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
-import AppHeader from "../../components/AppHeader";
 import Card from "../../components/Card";
-import GradientBackground from "../../components/GradientBackground";
+import RoleTopBar from "../../components/RoleTopBar";
 import ScreenContainer from "../../components/ScreenContainer";
 import StatCard from "../../components/StatCard";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { getAdminMonthlyReport, getAdminOverviewReport } from "../../services/adminService";
 import { colors } from "../../styles/theme";
+import { formatVND } from "../../utils/currency";
 
 const DEFAULT_OVERVIEW = {
   totals: { users: 0, courts: 0, bookings: 0, revenue: 0, activeBookings: 0 },
@@ -19,6 +19,9 @@ const DEFAULT_OVERVIEW = {
 export default function AdminReportsScreen({ onNavigate }) {
   const { token } = useAuth();
   const { theme } = useTheme();
+  const isDarkMode = theme.mode === "dark";
+  const primaryTextColor = isDarkMode ? colors.white : colors.textPrimary;
+  const secondaryTextColor = isDarkMode ? colors.white : colors.textSecondary;
   const currentYear = new Date().getFullYear();
   const [overview, setOverview] = useState(DEFAULT_OVERVIEW);
   const [monthly, setMonthly] = useState({ year: currentYear, months: [] });
@@ -75,31 +78,27 @@ export default function AdminReportsScreen({ onNavigate }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <AppHeader title="Reports & Analytics" leftText="‹" onLeftPress={() => onNavigate?.("dashboard")} />
+      <RoleTopBar />
       <ScreenContainer>
-        <GradientBackground style={styles.export}>
-          <Text style={styles.exportText}>Export Full Report</Text>
-        </GradientBackground>
-
-        <Text style={styles.section}>Overview</Text>
+        <Text style={[styles.section, { color: primaryTextColor }]}>Overview</Text>
         <View style={styles.gridRow}>
-          <StatCard value={overview.totals.users} label="Total Users" subtitle="From database" />
-          <StatCard value={overview.totals.bookings} label="Total Bookings" subtitle="All statuses" accent={colors.purple} />
+          <StatCard value={overview.totals.users} label="Total Users" subtitle="From database" iconName="people-outline" />
+          <StatCard value={overview.totals.bookings} label="Total Bookings" subtitle="All statuses" accent={colors.purple} iconName="receipt-outline" />
         </View>
         <View style={styles.gridRow}>
-          <StatCard value={`$${overview.totals.revenue}`} label="Total Revenue" subtitle="All time" accent={colors.success} />
-          <StatCard value={overview.totals.activeBookings} label="Active Bookings" subtitle="Confirmed" accent={colors.info} />
+          <StatCard value={formatVND(overview.totals.revenue)} label="Total Revenue" subtitle="All time" accent={colors.success} iconName="cash-outline" />
+          <StatCard value={overview.totals.activeBookings} label="Active Bookings" subtitle="Confirmed" accent={colors.info} iconName="calendar-clear-outline" />
         </View>
 
         {isLoading ? <ActivityIndicator size="large" color={colors.info} style={styles.loader} /> : null}
 
-        <Text style={styles.section}>Monthly Trends ({monthly.year || currentYear})</Text>
+        <Text style={[styles.section, { color: primaryTextColor }]}>Monthly Trends ({monthly.year || currentYear})</Text>
         <Card>
-          {monthlyRows.length === 0 ? <Text style={styles.empty}>No booking data for this year.</Text> : null}
+          {monthlyRows.length === 0 ? <Text style={[styles.empty, { color: secondaryTextColor }]}>No booking data for this year.</Text> : null}
           {monthlyRows.map((line) => (
             <View key={line.month} style={styles.trendRow}>
-              <Text style={styles.trendText}>
-                Month {line.month} - {line.bookings} bookings - ${line.revenue}
+              <Text style={[styles.trendText, { color: primaryTextColor }]}>
+                Month {line.month} - {line.bookings} bookings - {formatVND(line.revenue)}
               </Text>
               <View style={styles.progressTrack}>
                 <View
@@ -115,33 +114,33 @@ export default function AdminReportsScreen({ onNavigate }) {
           ))}
         </Card>
 
-        <Text style={styles.section}>Top Performing Courts</Text>
+        <Text style={[styles.section, { color: primaryTextColor }]}>Top Performing Courts</Text>
         <Card>
-          {topCourts.length === 0 ? <Text style={styles.empty}>No top courts yet.</Text> : null}
+          {topCourts.length === 0 ? <Text style={[styles.empty, { color: secondaryTextColor }]}>No top courts yet.</Text> : null}
           {topCourts.map((court, index) => (
             <View key={String(court.courtId)} style={styles.courtRow}>
               <View style={styles.rank}>
                 <Text style={styles.rankText}>{index + 1}</Text>
               </View>
               <View style={styles.courtInfo}>
-                <Text style={styles.courtName}>{court.courtName}</Text>
-                <Text style={styles.courtSub}>{court.totalBookings} bookings</Text>
+                <Text style={[styles.courtName, { color: primaryTextColor }]}>{court.courtName}</Text>
+                <Text style={[styles.courtSub, { color: secondaryTextColor }]}>{court.totalBookings} bookings</Text>
               </View>
-              <Text style={styles.revenue}>${court.revenue}</Text>
+              <Text style={styles.revenue}>{formatVND(court.revenue)}</Text>
             </View>
           ))}
         </Card>
 
-        <Text style={styles.section}>Booking Status</Text>
+        <Text style={[styles.section, { color: primaryTextColor }]}>Booking Status</Text>
         <Card>
           {[
             { label: "Confirmed", value: overview.bookingStatus.confirmed || 0, color: colors.success },
-            { label: "Completed", value: overview.bookingStatus.completed || 0, color: "#6b7280" },
+            { label: "Completed", value: overview.bookingStatus.completed || 0, color: isDarkMode ? colors.white : "#6b7280" },
             { label: "Cancelled", value: overview.bookingStatus.cancelled || 0, color: colors.danger },
           ].map((status) => (
             <View key={status.label} style={styles.statusRow}>
-              <Text style={styles.statusLabel}>{status.label}</Text>
-              <Text style={styles.statusValue}>{status.value}</Text>
+              <Text style={[styles.statusLabel, { color: primaryTextColor }]}>{status.label}</Text>
+              <Text style={[styles.statusValue, { color: secondaryTextColor }]}>{status.value}</Text>
               <View style={styles.statusTrack}>
                 <View
                   style={[
@@ -163,8 +162,6 @@ export default function AdminReportsScreen({ onNavigate }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  export: { alignItems: "center", paddingVertical: 14, borderRadius: 12 },
-  exportText: { color: colors.white, fontWeight: "700", fontSize: 16 },
   section: { color: colors.textPrimary, fontSize: 18, fontWeight: "700", marginTop: 4 },
   gridRow: { flexDirection: "row", gap: 10 },
   loader: { marginTop: 8 },

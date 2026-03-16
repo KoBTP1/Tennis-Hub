@@ -27,6 +27,11 @@ const courtSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    mapUrl: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     images: {
       type: [String],
       default: [],

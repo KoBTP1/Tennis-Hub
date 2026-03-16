@@ -8,12 +8,38 @@ async function getCourts(req, res, next) {
     const keyword = req.query.keyword || "";
     const location = req.query.location || "";
     
-    const result = await courtService.searchCourts({ keyword, location, page, limit });
+    const result = await courtService.searchCourts({
+      keyword,
+      location,
+      page,
+      limit,
+      userId: req.user?.userId || "",
+    });
 
     return res.status(200).json({
       success: true,
       data: result.items,
       pagination: result.pagination
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function postToggleFavorite(req, res, next) {
+  try {
+    const { id } = req.params;
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "Invalid court id." });
+    }
+    const result = await courtService.toggleFavorite({
+      userId: req.user.userId,
+      courtId: id,
+    });
+    return res.status(200).json({
+      success: true,
+      message: result.isFavorited ? "Court added to favorites." : "Court removed from favorites.",
+      data: result,
     });
   } catch (error) {
     return next(error);
@@ -26,7 +52,7 @@ async function getCourtDetails(req, res, next) {
     if (!isValidObjectId(id)) {
       return res.status(400).json({ success: false, message: "Invalid court id." });
     }
-    const court = await courtService.getCourtDetails(id);
+    const court = await courtService.getCourtDetails(id, req.user?.userId || "");
 
     return res.status(200).json({
       success: true,
@@ -64,4 +90,5 @@ module.exports = {
   getCourts,
   getCourtDetails,
   getCourtSlots,
+  postToggleFavorite,
 };

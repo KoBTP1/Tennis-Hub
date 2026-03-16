@@ -1,30 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import AppHeader from "../../components/AppHeader";
 import BookingCard from "../../components/BookingCard";
 import Card from "../../components/Card";
+import RoleTopBar from "../../components/RoleTopBar";
 import ScreenContainer from "../../components/ScreenContainer";
-import { API_BASE_URL } from "../../config/api";
 import { getOwnerBookings, updateOwnerBookingStatus } from "../../services/ownerService";
 import { useTheme } from "../../context/ThemeContext";
 import { colors, radius } from "../../styles/theme";
-
-function normalizeImageUrl(url) {
-  const raw = String(url || "").trim();
-  if (!raw) {
-    return "";
-  }
-
-  if (raw.startsWith("http://") || raw.startsWith("https://")) {
-    return raw;
-  }
-
-  const apiOrigin = API_BASE_URL.replace(/\/api\/?$/, "");
-  if (raw.startsWith("/")) {
-    return `${apiOrigin}${raw}`;
-  }
-  return `${apiOrigin}/${raw}`;
-}
+import { formatVND } from "../../utils/currency";
+import { normalizeImageUrl } from "../../utils/imageUrl";
 
 function resolveBookingImage(item) {
   const images = item?.court?.images;
@@ -84,12 +68,25 @@ export default function OwnerBookingsScreen({ onTabPress }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <AppHeader title="View Bookings" leftText="‹" onLeftPress={() => onTabPress?.("Home")} />
+      <RoleTopBar />
       <ScreenContainer>
         <Card style={styles.filters}>
           {filters.map((filter) => (
-            <TouchableOpacity key={filter.key} onPress={() => setSelectedStatus(filter.key)} style={[styles.pill, selectedStatus === filter.key ? styles.pillActive : null]}>
-              <Text style={[styles.pillText, { color: theme.text }, selectedStatus === filter.key ? styles.pillTextActive : null]}>{filter.label}</Text>
+            <TouchableOpacity
+              key={filter.key}
+              onPress={() => setSelectedStatus(filter.key)}
+              style={[
+                styles.pill,
+                {
+                  backgroundColor: theme.mode === "dark" ? theme.inputBackground : "#f3f4f6",
+                  borderColor: theme.border,
+                },
+                selectedStatus === filter.key ? styles.pillActive : null,
+              ]}
+            >
+              <Text style={[styles.pillText, { color: theme.mode === "dark" ? theme.textSecondary : theme.text }, selectedStatus === filter.key ? styles.pillTextActive : null]}>
+                {filter.label}
+              </Text>
             </TouchableOpacity>
           ))}
         </Card>
@@ -99,17 +96,17 @@ export default function OwnerBookingsScreen({ onTabPress }) {
             <Text style={[styles.statValue, { color: theme.text }]}>
               {bookings.filter((item) => item.status === "pending" || item.status === "confirmed").length}
             </Text>
-            <Text style={styles.statLabel}>Active</Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Active</Text>
           </Card>
           <Card style={styles.stat}>
             <Text style={[styles.statValue, { color: theme.text }]}>{bookings.filter((item) => item.status === "completed").length}</Text>
-            <Text style={styles.statLabel}>Completed</Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Completed</Text>
           </Card>
           <Card style={styles.stat}>
             <Text style={[styles.statValue, { color: theme.text }]}>
-              ${bookings.reduce((sum, item) => sum + Number(item.totalPrice || 0), 0)}
+              {formatVND(bookings.reduce((sum, item) => sum + Number(item.totalPrice || 0), 0))}
             </Text>
-            <Text style={styles.statLabel}>Revenue</Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Revenue</Text>
           </Card>
         </View>
 
@@ -122,7 +119,7 @@ export default function OwnerBookingsScreen({ onTabPress }) {
               subtitle={item.court?.name || "Court"}
               date={item.slot?.date || "-"}
               time={`${item.slot?.startTime || ""} - ${item.slot?.endTime || ""}`}
-              amount={`$${item.totalPrice || 0}`}
+              amount={formatVND(item.totalPrice || 0)}
               status={item.status}
               imageUrl={resolveBookingImage(item)}
               actions={
@@ -148,12 +145,12 @@ export default function OwnerBookingsScreen({ onTabPress }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   filters: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  pill: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: radius.full, backgroundColor: "#f3f4f6" },
+  pill: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: radius.full, borderWidth: 1 },
   pillActive: { backgroundColor: colors.info },
   pillText: { fontWeight: "600" },
   pillTextActive: { color: colors.white },
   statsRow: { flexDirection: "row", gap: 8 },
   stat: { flex: 1, alignItems: "center" },
   statValue: { fontSize: 24, fontWeight: "800", color: colors.textPrimary },
-  statLabel: { color: colors.textSecondary },
+  statLabel: {},
 });

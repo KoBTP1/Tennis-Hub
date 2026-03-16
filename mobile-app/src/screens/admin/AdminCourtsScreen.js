@@ -1,20 +1,37 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import AppHeader from "../../components/AppHeader";
 import Card from "../../components/Card";
 import CourtCard from "../../components/CourtCard";
+import RoleTopBar from "../../components/RoleTopBar";
 import ScreenContainer from "../../components/ScreenContainer";
+import { API_BASE_URL } from "../../config/api";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { getAdminCourts, updateAdminCourtStatus } from "../../services/adminService";
 import { colors, radius } from "../../styles/theme";
+import { formatVNDPerHour } from "../../utils/currency";
 
 const DEFAULT_STATS = {
   totalCourts: 0,
   byStatus: { pending: 0, approved: 0, suspended: 0, rejected: 0 },
 };
 
-export default function AdminCourtsScreen({ onNavigate }) {
+function normalizeImageUrl(url) {
+  const raw = String(url || "").trim();
+  if (!raw) {
+    return "";
+  }
+  if (raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("file://")) {
+    return raw;
+  }
+  const apiOrigin = API_BASE_URL.replace(/\/api\/?$/, "");
+  if (raw.startsWith("/")) {
+    return `${apiOrigin}${raw}`;
+  }
+  return `${apiOrigin}/${raw}`;
+}
+
+export default function AdminCourtsScreen({ onNavigate, onOpenCourt }) {
   const { token } = useAuth();
   const { theme } = useTheme();
   const [courts, setCourts] = useState([]);
@@ -102,14 +119,19 @@ export default function AdminCourtsScreen({ onNavigate }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <AppHeader title="Manage Courts" leftText="‹" onLeftPress={() => onNavigate?.("dashboard")} />
+      <RoleTopBar />
       <KeyboardAvoidingView style={styles.keyboardAvoiding} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScreenContainer>
           <Card style={styles.searchCard}>
             <TextInput
               placeholder="Search courts by name, location or owner..."
               placeholderTextColor="#9ca3af"
-              style={styles.searchInput}
+              style={[
+                styles.searchInput,
+                {
+                  color: theme.text,
+                },
+              ]}
               value={keyword}
               onChangeText={setKeyword}
             />
@@ -119,10 +141,25 @@ export default function AdminCourtsScreen({ onNavigate }) {
           {filters.map((item) => (
             <TouchableOpacity
               key={item.key}
-              style={[styles.pill, selectedStatus === item.key ? styles.pillActive : null]}
+              style={[
+                styles.pill,
+                {
+                  backgroundColor: theme.mode === "dark" ? theme.inputBackground : colors.white,
+                  borderColor: theme.border,
+                },
+                selectedStatus === item.key ? styles.pillActive : null,
+              ]}
               onPress={() => setSelectedStatus(item.key)}
             >
-              <Text style={[styles.pillText, selectedStatus === item.key ? styles.pillTextActive : null]}>{item.label}</Text>
+              <Text
+                style={[
+                  styles.pillText,
+                  { color: theme.mode === "dark" ? colors.white : colors.textPrimary },
+                  selectedStatus === item.key ? styles.pillTextActive : null,
+                ]}
+              >
+                {item.label}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -130,31 +167,37 @@ export default function AdminCourtsScreen({ onNavigate }) {
         <View style={styles.statRow}>
           <Card style={styles.statCard}>
             <Text style={styles.statValue}>{stats.totalCourts || 0}</Text>
-            <Text style={styles.statLabel}>Total Courts</Text>
+            <Text style={[styles.statLabel, { color: theme.mode === "dark" ? colors.white : colors.textSecondary }]}>Total Courts</Text>
           </Card>
           <Card style={styles.statCard}>
             <Text style={styles.statValue}>{stats.byStatus.approved || 0}</Text>
-            <Text style={styles.statLabel}>Approved</Text>
+            <Text style={[styles.statLabel, { color: theme.mode === "dark" ? colors.white : colors.textSecondary }]}>Approved</Text>
           </Card>
           <Card style={styles.statCard}>
             <Text style={styles.statValue}>{stats.byStatus.pending || 0}</Text>
-            <Text style={styles.statLabel}>Pending</Text>
+            <Text style={[styles.statLabel, { color: theme.mode === "dark" ? colors.white : colors.textSecondary }]}>Pending</Text>
           </Card>
         </View>
 
-        <Text style={styles.count}>{totalCourts} courts found</Text>
+        <Text style={[styles.count, { color: theme.mode === "dark" ? colors.white : colors.textSecondary }]}>{totalCourts} courts found</Text>
         {isLoading ? <ActivityIndicator size="large" color={colors.info} style={styles.loader} /> : null}
-        {!isLoading && courts.length === 0 ? <Text style={styles.empty}>No courts found.</Text> : null}
+        {!isLoading && courts.length === 0 ? <Text style={[styles.empty, { color: theme.mode === "dark" ? colors.white : colors.textSecondary }]}>No courts found.</Text> : null}
           {!isLoading &&
             courts.map((court) => (
               <CourtCard
                 key={court.id}
                 name={court.name}
                 location={court.location}
-                price={`$${court.pricePerHour}/hour`}
+                mapUrl={court.mapUrl}
+                price={formatVNDPerHour(court.pricePerHour)}
+                imageUrls={Array.isArray(court.images) ? court.images.map((item) => normalizeImageUrl(item)) : []}
+                imageUrl={normalizeImageUrl(Array.isArray(court.images) ? court.images[0] || "" : "")}
                 rating={court.rating ? court.rating.toFixed(1) : "-"}
                 reviews={court.reviewsCount || 0}
                 badge={getBadge(court.status)}
+                primaryActionLabel="XEM CHI TIẾT"
+                onPrimaryAction={() => onOpenCourt?.(court.mongoId || court.id)}
+                onPress={() => onOpenCourt?.(court.mongoId || court.id)}
                 actions={[
                   {
                     label: "Approve",

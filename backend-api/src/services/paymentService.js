@@ -2,8 +2,100 @@ const mongoose = require("mongoose");
 const Booking = require("../models/Booking");
 const Payment = require("../models/Payment");
 
+function isTransactionNotSupportedError(error) {
+  const message = String(error?.message || "");
+  return message.includes("Transaction numbers are only allowed on a replica set member or mongos");
+}
+
 async function confirmMockPayment({ bookingId, userId, idempotencyKey = "" }) {
   const normalizedKey = String(idempotencyKey || "").trim() || `mockpay:${bookingId}:${userId}`;
+  const confirmWithoutTransaction = async () => {
+    const booking = await Booking.findById(bookingId);
+    if (!booking) {
+      const error = new Error("Booking not found.");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (String(booking.userId) !== String(userId)) {
+      const error = new Error("Not allowed to pay for this booking.");
+      error.statusCode = 403;
+      throw error;
+    }
+
+    if (booking.status === "cancelled" || booking.status === "completed") {
+      const error = new Error("This booking is not payable.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const existingByKey = await Payment.findOne({ idempotencyKey: normalizedKey }).lean();
+    if (existingByKey) {
+      return {
+        bookingId: booking._id.toString(),
+        bookingStatus: booking.status,
+        paymentStatus: booking.paymentStatus || "unpaid",
+        paymentMethod: booking.paymentMethod || "mock",
+        transactionId: existingByKey.transactionId || booking.paymentOrderId || "",
+        amount: Number(booking.totalPrice || 0),
+        status: existingByKey.status,
+        message: "Duplicate payment request ignored (idempotent).",
+      };
+    }
+
+    const existingPaid = await Payment.findOne({ bookingId, status: "paid" }).lean();
+    if (booking.paymentStatus === "paid" || existingPaid) {
+      return {
+        bookingId: booking._id.toString(),
+        bookingStatus: booking.status,
+        paymentStatus: "paid",
+        paymentMethod: booking.paymentMethod || "mock",
+        transactionId: existingPaid?.transactionId || booking.paymentOrderId || "",
+        amount: Number(booking.totalPrice || 0),
+        status: "paid",
+        message: "Booking already paid.",
+      };
+    }
+
+    const amount = Math.max(0, Math.round(Number(booking.totalPrice || 0)));
+    const transactionId = `MOCK_${booking._id}_${Date.now()}`;
+    const payment = await Payment.create({
+      bookingId: booking._id,
+      userId,
+      provider: "mock",
+      amount,
+      transactionId,
+      idempotencyKey: normalizedKey,
+      message: "Mock payment confirmed.",
+      status: "paid",
+      rawPayload: {
+        source: "manual-mock-confirm",
+        bookingId: booking._id.toString(),
+        userId: String(userId),
+        idempotencyKey: normalizedKey,
+      },
+    });
+
+    booking.paymentStatus = "paid";
+    booking.paymentMethod = "mock";
+    booking.paymentOrderId = transactionId;
+    if (booking.status === "pending") {
+      booking.status = "confirmed";
+    }
+    await booking.save();
+
+    return {
+      bookingId: booking._id.toString(),
+      bookingStatus: booking.status,
+      paymentStatus: booking.paymentStatus,
+      paymentMethod: booking.paymentMethod,
+      transactionId,
+      amount,
+      status: payment.status,
+      message: "Mock payment confirmed successfully.",
+    };
+  };
+
   const session = await mongoose.startSession();
   try {
     let responsePayload = null;
@@ -103,6 +195,9 @@ async function confirmMockPayment({ bookingId, userId, idempotencyKey = "" }) {
     });
     return responsePayload;
   } catch (error) {
+    if (isTransactionNotSupportedError(error)) {
+      return confirmWithoutTransaction();
+    }
     if (error?.code === 11000) {
       const booking = await Booking.findById(bookingId).lean();
       const existingPaid = await Payment.findOne({ bookingId, status: "paid" }).sort({ createdAt: -1 }).lean();

@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import AppHeader from "../../components/AppHeader";
 import Card from "../../components/Card";
 import GradientBackground from "../../components/GradientBackground";
 import GradientButton from "../../components/GradientButton";
+import RoleTopBar from "../../components/RoleTopBar";
 import ScreenContainer from "../../components/ScreenContainer";
 import StatCard from "../../components/StatCard";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { getAdminOverviewReport } from "../../services/adminService";
 import { colors } from "../../styles/theme";
+import { formatVND } from "../../utils/currency";
 
 export default function AdminDashboardScreen({ onNavigate }) {
   const { user, token, logout } = useAuth();
@@ -67,7 +68,7 @@ export default function AdminDashboardScreen({ onNavigate }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <AppHeader title="Admin Dashboard" />
+      <RoleTopBar />
       <ScreenContainer>
         <GradientBackground style={styles.hero}>
           <View style={styles.avatar}>
@@ -81,12 +82,12 @@ export default function AdminDashboardScreen({ onNavigate }) {
         </GradientBackground>
 
         <View style={styles.gridRow}>
-          <StatCard value={overview.totals.users} label="Total Users" subtitle="From database" accent={colors.info} />
-          <StatCard value={overview.totals.courts} label="Total Courts" subtitle="From database" accent={colors.success} />
+          <StatCard value={overview.totals.users} label="Total Users" subtitle="From database" accent={colors.info} iconName="people-outline" />
+          <StatCard value={overview.totals.courts} label="Total Courts" subtitle="From database" accent={colors.success} iconName="tennisball-outline" />
         </View>
         <View style={styles.gridRow}>
-          <StatCard value={overview.totals.bookings} label="Total Bookings" subtitle="All statuses" accent={colors.info} />
-          <StatCard value={`$${overview.totals.revenue}`} label="Total Revenue" subtitle="All time" accent={colors.success} />
+          <StatCard value={overview.totals.bookings} label="Total Bookings" subtitle="All statuses" accent={colors.info} iconName="receipt-outline" />
+          <StatCard value={formatVND(overview.totals.revenue)} label="Total Revenue" subtitle="All time" accent={colors.success} iconName="cash-outline" />
         </View>
         {isLoadingOverview ? <ActivityIndicator size="small" color={colors.info} /> : null}
 
@@ -95,11 +96,12 @@ export default function AdminDashboardScreen({ onNavigate }) {
           { label: "Manage Users", key: "users" },
           { label: "Manage Courts", key: "courts" },
           { label: "View Reports", key: "reports" },
+          { label: "Edit Profile", key: "editProfile" },
         ].map((item) => (
           <TouchableOpacity key={item.label} activeOpacity={0.85} onPress={() => onNavigate?.(item.key)}>
             <Card style={styles.actionCard}>
               <Text style={[styles.actionText, { color: theme.text }]}>{item.label}</Text>
-              <Text style={styles.arrow}>→</Text>
+              <Text style={[styles.arrow, { color: theme.textSecondary }]}>→</Text>
             </Card>
           </TouchableOpacity>
         ))}

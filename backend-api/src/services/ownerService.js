@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Booking = require("../models/Booking");
 const Court = require("../models/Court");
 const CourtSlot = require("../models/CourtSlot");
+const notificationService = require("./notificationService");
 const { getNextSequence } = require("../utils/sequence");
 const { escapeRegex } = require("../utils/requestValidation");
 
@@ -48,6 +49,7 @@ function sanitizeCourt(court) {
     location: court.location,
     pricePerHour: court.pricePerHour || 0,
     description: court.description || "",
+    mapUrl: court.mapUrl || "",
     images: court.images || [],
     status: court.status,
     createdAt: court.createdAt,
@@ -59,6 +61,24 @@ function normalizeImages(images) {
     return [];
   }
   return images.map((item) => String(item || "").trim()).filter(Boolean);
+}
+
+function normalizeMapUrl(mapUrl) {
+  const normalized = String(mapUrl || "").trim();
+  if (!normalized) {
+    return "";
+  }
+  if (!/^https?:\/\//i.test(normalized)) {
+    const error = new Error("mapUrl must start with http:// or https://");
+    error.statusCode = 400;
+    throw error;
+  }
+  return normalized;
+}
+
+function isTransactionNotSupportedError(error) {
+  const message = String(error?.message || "");
+  return message.includes("Transaction numbers are only allowed on a replica set member or mongos");
 }
 
 function sanitizeSlot(slot) {
@@ -152,7 +172,7 @@ async function listOwnerCourts({ ownerId, keyword = "", status = "", page = 1, l
 }
 
 async function createOwnerCourt({ ownerId, payload }) {
-  const { name, location, pricePerHour, description = "", images = [] } = payload || {};
+  const { name, location, pricePerHour, description = "", images = [], mapUrl = "" } = payload || {};
   const normalizedName = String(name || "").trim();
   const normalizedLocation = String(location || "").trim();
   if (!normalizedName || !normalizedLocation || pricePerHour === undefined) {
@@ -167,26 +187,46 @@ async function createOwnerCourt({ ownerId, payload }) {
     throw error;
   }
   const normalizedImages = normalizeImages(images);
-  const nextId = await getNextSequence("court_id");
+  const normalizedMapUrl = normalizeMapUrl(mapUrl);
 
-  const court = await Court.create({
-    id: nextId,
-    name: normalizedName,
-    location: normalizedLocation,
-    pricePerHour: parsedPrice,
-    description: String(description || "").trim(),
-    images: normalizedImages,
-    ownerId,
-    status: "pending",
-    isDeleted: false,
-  });
+  // Guard against stale counter values by retrying on numeric-id collisions.
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const nextId = await getNextSequence("court_id");
+    const hasCollision = await Court.exists({ id: nextId });
+    if (hasCollision) {
+      continue;
+    }
 
-  return sanitizeCourt(court);
+    try {
+      const court = await Court.create({
+        id: nextId,
+        name: normalizedName,
+        location: normalizedLocation,
+        pricePerHour: parsedPrice,
+        description: String(description || "").trim(),
+        mapUrl: normalizedMapUrl,
+        images: normalizedImages,
+        ownerId,
+        status: "pending",
+        isDeleted: false,
+      });
+      return sanitizeCourt(court);
+    } catch (error) {
+      if (error?.code === 11000 && /id_1/.test(String(error?.message || ""))) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  const error = new Error("Unable to generate a unique court id. Please try again.");
+  error.statusCode = 409;
+  throw error;
 }
 
 async function updateOwnerCourt({ ownerId, courtId, payload }) {
   const court = await getOwnedCourtOrThrow({ ownerId, courtId });
-  const { name, location, pricePerHour, description, images } = payload || {};
+  const { name, location, pricePerHour, description, images, mapUrl } = payload || {};
 
   if (name !== undefined) {
     const normalizedName = String(name).trim();
@@ -220,6 +260,9 @@ async function updateOwnerCourt({ ownerId, courtId, payload }) {
   }
   if (images !== undefined) {
     court.images = normalizeImages(images);
+  }
+  if (mapUrl !== undefined) {
+    court.mapUrl = normalizeMapUrl(mapUrl);
   }
 
   await court.save();
@@ -278,6 +321,26 @@ async function createOwnerSlot({ ownerId, courtId, payload }) {
   const normalizedStart = String(startTime).trim();
   const normalizedEnd = String(endTime).trim();
 
+  const createSlotWithoutTransaction = async () => {
+    const court = await getOwnedCourtOrThrow({ ownerId, courtId });
+    court.slotRevision = Number(court.slotRevision || 0) + 1;
+    await court.save();
+    await ensureNoSlotOverlap({
+      courtId,
+      date: normalizedDate,
+      startTime: normalizedStart,
+      endTime: normalizedEnd,
+    });
+    const slot = await CourtSlot.create({
+      courtId,
+      date: normalizedDate,
+      startTime: normalizedStart,
+      endTime: normalizedEnd,
+      isBooked: false,
+    });
+    return sanitizeSlot(slot);
+  };
+
   // Retry transient transaction conflicts when concurrent owner updates happen.
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const session = await mongoose.startSession();
@@ -313,6 +376,10 @@ async function createOwnerSlot({ ownerId, courtId, payload }) {
       });
       return sanitizeSlot(createdSlot);
     } catch (error) {
+      if (isTransactionNotSupportedError(error)) {
+        await session.endSession();
+        return createSlotWithoutTransaction();
+      }
       if (error?.code === 11000) {
         error.statusCode = 409;
         error.message = "Slot overlaps with existing slot.";
@@ -341,6 +408,38 @@ async function getOwnedSlotOrThrow({ ownerId, slotId, session = undefined }) {
 }
 
 async function updateOwnerSlot({ ownerId, slotId, payload }) {
+  const updateSlotWithoutTransaction = async () => {
+    const slot = await getOwnedSlotOrThrow({ ownerId, slotId });
+    if (slot.isBooked) {
+      const error = new Error("Cannot update booked slot.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const nextDate = payload?.date !== undefined ? String(payload.date).trim() : slot.date;
+    const nextStartTime = payload?.startTime !== undefined ? String(payload.startTime).trim() : slot.startTime;
+    const nextEndTime = payload?.endTime !== undefined ? String(payload.endTime).trim() : slot.endTime;
+    ensureValidSlotTime(nextStartTime, nextEndTime);
+
+    const ownedCourt = await getOwnedCourtOrThrow({ ownerId, courtId: slot.courtId });
+    ownedCourt.slotRevision = Number(ownedCourt.slotRevision || 0) + 1;
+    await ownedCourt.save();
+
+    await ensureNoSlotOverlap({
+      courtId: slot.courtId,
+      date: nextDate,
+      startTime: nextStartTime,
+      endTime: nextEndTime,
+      excludeSlotId: slot._id,
+    });
+
+    slot.date = nextDate;
+    slot.startTime = nextStartTime;
+    slot.endTime = nextEndTime;
+    await slot.save();
+    return sanitizeSlot(slot);
+  };
+
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const session = await mongoose.startSession();
     try {
@@ -379,6 +478,10 @@ async function updateOwnerSlot({ ownerId, slotId, payload }) {
       });
       return sanitizeSlot(updatedSlot);
     } catch (error) {
+      if (isTransactionNotSupportedError(error)) {
+        await session.endSession();
+        return updateSlotWithoutTransaction();
+      }
       if (error?.code === 11000) {
         error.statusCode = 409;
         error.message = "Slot overlaps with existing slot.";
@@ -503,6 +606,20 @@ async function updateOwnerBookingStatus({ ownerId, bookingId, status }) {
     .populate("userId", "name email phone")
     .populate("courtId", "name location pricePerHour images")
     .populate("slotId", "date startTime endTime");
+  if (["confirmed", "cancelled"].includes(status) && populated?.userId?._id) {
+    const humanStatus = status === "confirmed" ? "approved" : "rejected";
+    await notificationService.createNotification({
+      recipientId: populated.userId._id,
+      actorId: ownerId,
+      type: "booking_status_changed",
+      title: "Booking request updated",
+      message: `Your booking for "${populated.courtId?.name || "court"}" was ${humanStatus} by owner.`,
+      metadata: {
+        bookingId: booking._id.toString(),
+        status,
+      },
+    });
+  }
   return sanitizeBooking(populated);
 }
 

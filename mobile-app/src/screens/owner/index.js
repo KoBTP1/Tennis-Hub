@@ -1,5 +1,9 @@
 export { default as OwnerDashboardScreen } from "./OwnerDashboardScreen";
+export { default as OwnerHomeScreen } from "./OwnerHomeScreen";
+export { default as OwnerCourtDetailScreen } from "./OwnerCourtDetailScreen";
 export { default as OwnerCourtsScreen } from "./OwnerCourtsScreen";
 export { default as OwnerScheduleScreen } from "./OwnerScheduleScreen";
+export { default as OwnerManageScreen } from "./OwnerManageScreen";
 export { default as OwnerBookingsScreen } from "./OwnerBookingsScreen";
+export { default as OwnerSettingsScreen } from "./OwnerSettingsScreen";
 export { default as OwnerMainScreen } from "./OwnerMainScreen";
