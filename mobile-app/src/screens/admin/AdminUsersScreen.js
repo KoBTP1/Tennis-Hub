@@ -107,7 +107,7 @@ export default function AdminUsersScreen({ onNavigate }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <RoleTopBar />
+      <RoleTopBar onBack={() => onNavigate?.("dashboard")} onAvatarPress={() => onNavigate?.("editProfile")} />
       <KeyboardAvoidingView style={styles.keyboardAvoiding} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScreenContainer>
           <Card style={styles.searchCard}>

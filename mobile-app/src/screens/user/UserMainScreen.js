@@ -17,6 +17,19 @@ export default function UserMainScreen() {
   const [activeTab, setActiveTab] = useState("Home");
   const [activeScreen, setActiveScreen] = useState(null);
   const [selectedCourtId, setSelectedCourtId] = useState(null);
+  const [favoriteRevision, setFavoriteRevision] = useState(0);
+  const [favoriteByCourtId, setFavoriteByCourtId] = useState({});
+
+  const syncFavoriteState = (courtId, isFavorited) => {
+    const key = String(courtId || "").trim();
+    if (!key) {
+      return;
+    }
+    setFavoriteByCourtId((prev) => ({
+      ...prev,
+      [key]: Boolean(isFavorited),
+    }));
+  };
 
   const ActiveScreen = useMemo(() => tabScreenByName[activeTab] || UserHomeScreen, [activeTab]);
 
@@ -31,7 +44,7 @@ export default function UserMainScreen() {
   }
 
   if (activeScreen === "settings") {
-    return <UserSettingsScreen onBack={() => setActiveScreen(null)} />;
+    return <UserSettingsScreen onBack={() => setActiveScreen(null)} onNavigate={setActiveScreen} />;
   }
 
   return (
@@ -39,6 +52,10 @@ export default function UserMainScreen() {
       <ActiveScreen
         onTabPress={handleTabPress}
         onNavigate={setActiveScreen}
+        favoritesRevision={favoriteRevision}
+        onFavoriteChanged={() => setFavoriteRevision((prev) => prev + 1)}
+        favoriteOverrides={favoriteByCourtId}
+        onFavoriteStateChange={syncFavoriteState}
         onOpenCourt={(courtId) => {
           setSelectedCourtId(courtId);
           setActiveScreen("court-detail");
@@ -58,7 +75,13 @@ export default function UserMainScreen() {
                 asSheet
                 onBack={() => setActiveScreen(null)}
                 onTabPress={handleTabPress}
+                allowBooking
+                showBookingActions
                 showHeaderBookingAction={false}
+                favoriteRevision={favoriteRevision}
+                onFavoriteChanged={() => setFavoriteRevision((prev) => prev + 1)}
+                forcedFavoriteState={favoriteByCourtId[String(selectedCourtId || "")]}
+                onFavoriteStateChange={syncFavoriteState}
               />
             ) : null}
           </View>

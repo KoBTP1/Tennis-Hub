@@ -6,13 +6,13 @@ import { colors, radius } from "../../styles/theme";
 import OwnerCourtsScreen from "./OwnerCourtsScreen";
 import OwnerScheduleScreen from "./OwnerScheduleScreen";
 
-export default function OwnerManageScreen({ onTabPress, onOpenCourt }) {
+export default function OwnerManageScreen({ onTabPress, onOpenCourt, onNavigate, favoriteOverrides = {}, onFavoriteStateChange }) {
   const { theme } = useTheme();
   const [activeSection, setActiveSection] = useState("courts");
 
   return (
     <View style={styles.root}>
-      <RoleTopBar />
+      <RoleTopBar onAvatarPress={() => onNavigate?.("edit-profile")} />
       <View style={[styles.switchRow, { borderBottomColor: theme.border, backgroundColor: theme.card }]}>
         {[
           { key: "courts", label: "Tạo sân" },
@@ -38,9 +38,16 @@ export default function OwnerManageScreen({ onTabPress, onOpenCourt }) {
       </View>
       <View style={styles.content}>
         {activeSection === "courts" ? (
-          <OwnerCourtsScreen onTabPress={onTabPress} onOpenCourt={onOpenCourt} embedded />
+          <OwnerCourtsScreen
+            onTabPress={onTabPress}
+            onOpenCourt={onOpenCourt}
+            onNavigate={onNavigate}
+            embedded
+            favoriteOverrides={favoriteOverrides}
+            onFavoriteStateChange={onFavoriteStateChange}
+          />
         ) : (
-          <OwnerScheduleScreen onTabPress={onTabPress} embedded />
+          <OwnerScheduleScreen onTabPress={onTabPress} onNavigate={onNavigate} embedded />
         )}
       </View>
     </View>

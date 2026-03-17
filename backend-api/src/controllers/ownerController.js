@@ -59,6 +59,24 @@ async function getCourts(req, res, next) {
   }
 }
 
+async function getCourtDetail(req, res, next) {
+  try {
+    if (!isValidObjectId(req.params.id)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid court id." });
+    }
+
+    const court = await ownerService.getOwnerCourtDetail({
+      ownerId: req.user.userId,
+      courtId: req.params.id,
+    });
+    return res.status(200).json({ success: true, data: court });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 async function createCourt(req, res, next) {
   try {
     const court = await ownerService.createOwnerCourt({
@@ -320,6 +338,7 @@ async function uploadImage(req, res, next) {
 module.exports = {
   getDashboard,
   getCourts,
+  getCourtDetail,
   createCourt,
   patchCourt,
   deleteCourt,

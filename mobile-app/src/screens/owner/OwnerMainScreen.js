@@ -22,6 +22,18 @@ export default function OwnerMainScreen() {
   const [activeTab, setActiveTab] = useState("Home");
   const [activeScreen, setActiveScreen] = useState(null);
   const [selectedCourtId, setSelectedCourtId] = useState(null);
+  const [favoriteByCourtId, setFavoriteByCourtId] = useState({});
+
+  const syncFavoriteState = (courtId, isFavorited) => {
+    const key = String(courtId || "").trim();
+    if (!key) {
+      return;
+    }
+    setFavoriteByCourtId((prev) => ({
+      ...prev,
+      [key]: Boolean(isFavorited),
+    }));
+  };
 
   const ActiveScreen = useMemo(() => screenByTab[activeTab] || OwnerHomeScreen, [activeTab]);
   const handleTabPress = (tab) => {
@@ -43,6 +55,8 @@ export default function OwnerMainScreen() {
       <View style={{ flex: 1 }}>
       <ActiveScreen
         onTabPress={handleTabPress}
+        favoriteOverrides={favoriteByCourtId}
+        onFavoriteStateChange={syncFavoriteState}
         onNavigate={(next) => {
           if (next === "settings") {
             setActiveScreen("settings");
@@ -76,6 +90,8 @@ export default function OwnerMainScreen() {
             {selectedCourtId ? (
               <OwnerCourtDetailScreen
                 courtId={selectedCourtId}
+                forcedFavoriteState={favoriteByCourtId[String(selectedCourtId || "")]}
+                onFavoriteStateChange={syncFavoriteState}
                 onBack={() => {
                   setActiveScreen(null);
                   setSelectedCourtId(null);

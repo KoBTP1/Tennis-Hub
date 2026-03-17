@@ -1,5 +1,5 @@
 const adminService = require("../services/adminService");
-const { isValidObjectId, parsePositiveInt } = require("../utils/requestValidation");
+const { isValidDateString, isValidObjectId, parsePositiveInt } = require("../utils/requestValidation");
 
 const USER_ROLES = new Set(["", "all", "player", "owner", "admin"]);
 const USER_STATUSES = new Set(["", "all", "active", "blocked"]);
@@ -84,6 +84,41 @@ async function getCourts(req, res, next) {
   }
 }
 
+async function getCourtDetail(req, res, next) {
+  try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ success: false, message: "Invalid court id." });
+    }
+    const court = await adminService.getCourtDetail(req.params.id);
+    return res.status(200).json({
+      success: true,
+      message: "Court detail fetched successfully.",
+      data: court,
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function getCourtSlots(req, res, next) {
+  try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ success: false, message: "Invalid court id." });
+    }
+    if (req.query.date && !isValidDateString(req.query.date)) {
+      return res.status(400).json({ success: false, message: "date must be in YYYY-MM-DD format." });
+    }
+    const slots = await adminService.getCourtSlots(req.params.id, req.query.date || "");
+    return res.status(200).json({
+      success: true,
+      message: "Court slots fetched successfully.",
+      data: slots,
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 async function patchCourtStatus(req, res, next) {
   try {
     if (!isValidObjectId(req.params.id)) {
@@ -143,6 +178,8 @@ module.exports = {
   getUsers,
   patchUserStatus,
   getCourts,
+  getCourtDetail,
+  getCourtSlots,
   patchCourtStatus,
   getOverviewReport,
   getMonthlyReport,

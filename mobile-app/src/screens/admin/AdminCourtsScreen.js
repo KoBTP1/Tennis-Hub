@@ -31,7 +31,7 @@ function normalizeImageUrl(url) {
   return `${apiOrigin}/${raw}`;
 }
 
-export default function AdminCourtsScreen({ onNavigate, onOpenCourt }) {
+export default function AdminCourtsScreen({ onNavigate, onOpenCourt, favoriteOverrides = {}, onFavoriteStateChange }) {
   const { token } = useAuth();
   const { theme } = useTheme();
   const [courts, setCourts] = useState([]);
@@ -119,7 +119,7 @@ export default function AdminCourtsScreen({ onNavigate, onOpenCourt }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <RoleTopBar />
+      <RoleTopBar onBack={() => onNavigate?.("dashboard")} onAvatarPress={() => onNavigate?.("editProfile")} />
       <KeyboardAvoidingView style={styles.keyboardAvoiding} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScreenContainer>
           <Card style={styles.searchCard}>
@@ -183,7 +183,11 @@ export default function AdminCourtsScreen({ onNavigate, onOpenCourt }) {
         {isLoading ? <ActivityIndicator size="large" color={colors.info} style={styles.loader} /> : null}
         {!isLoading && courts.length === 0 ? <Text style={[styles.empty, { color: theme.mode === "dark" ? colors.white : colors.textSecondary }]}>No courts found.</Text> : null}
           {!isLoading &&
-            courts.map((court) => (
+            courts.map((court) => {
+              const detailCourtId = String(court.mongoId || court.id || "");
+              const hasOverride = Object.hasOwn(favoriteOverrides, detailCourtId);
+              const isFavorite = hasOverride ? Boolean(favoriteOverrides[detailCourtId]) : false;
+              return (
               <CourtCard
                 key={court.id}
                 name={court.name}
@@ -195,6 +199,8 @@ export default function AdminCourtsScreen({ onNavigate, onOpenCourt }) {
                 rating={court.rating ? court.rating.toFixed(1) : "-"}
                 reviews={court.reviewsCount || 0}
                 badge={getBadge(court.status)}
+                isFavorite={isFavorite}
+                onToggleFavorite={() => onFavoriteStateChange?.(detailCourtId, !isFavorite)}
                 primaryActionLabel="XEM CHI TIẾT"
                 onPrimaryAction={() => onOpenCourt?.(court.mongoId || court.id)}
                 onPress={() => onOpenCourt?.(court.mongoId || court.id)}
@@ -218,7 +224,8 @@ export default function AdminCourtsScreen({ onNavigate, onOpenCourt }) {
                   },
                 ]}
               />
-            ))}
+              );
+            })}
         </ScreenContainer>
       </KeyboardAvoidingView>
     </View>

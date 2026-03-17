@@ -17,6 +17,16 @@ const courtSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    locationVi: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    locationEn: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     pricePerHour: {
       type: Number,
       required: true,
@@ -27,7 +37,32 @@ const courtSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    serviceContent: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     mapUrl: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    contactPhone: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    zaloLink: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    facebookLink: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    openingHours: {
       type: String,
       trim: true,
       default: "",

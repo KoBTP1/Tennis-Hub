@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Card from "./Card";
 import { API_BASE_URL } from "../config/api";
 import { useTheme } from "../context/ThemeContext";
+import { useLanguage } from "../context/LanguageContext";
 import { colors, radius } from "../styles/theme";
 
 export default function CourtCard({
@@ -22,12 +23,14 @@ export default function CourtCard({
   onPress,
   isFavorite = false,
   onToggleFavorite,
-  primaryActionLabel = "XEM CHI TIẾT",
+  primaryActionLabel,
   onPrimaryAction,
   showPrimaryAction = true,
 }) {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const [localFavorite, setLocalFavorite] = useState(Boolean(isFavorite));
+  const resolvedPrimaryActionLabel = primaryActionLabel || t("viewDetails");
   const apiOrigin = useMemo(() => API_BASE_URL.replace(/\/api\/?$/, ""), []);
   const effectiveFavorite = onToggleFavorite ? Boolean(isFavorite) : localFavorite;
   const primaryImage =
@@ -61,12 +64,12 @@ export default function CourtCard({
     try {
       const canOpen = await Linking.canOpenURL(googleMapUrl);
       if (!canOpen) {
-        Alert.alert("Map", "Cannot open Google Maps link.");
+        Alert.alert(t("map"), t("cannotOpenGoogleMaps"));
         return;
       }
       await Linking.openURL(googleMapUrl);
     } catch {
-      Alert.alert("Map", "Cannot open Google Maps link.");
+      Alert.alert(t("map"), t("cannotOpenGoogleMaps"));
     }
   };
 
@@ -97,10 +100,10 @@ export default function CourtCard({
       void openGoogleMaps();
       return;
     }
-    Alert.alert("Open map", "Choose how you want to view this location.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Default Maps", onPress: () => void openNativeMaps() },
-      { text: "Google Maps", onPress: () => void openGoogleMaps() },
+    Alert.alert(t("openMap"), t("chooseMapView"), [
+      { text: t("cancel"), style: "cancel" },
+      { text: t("defaultMaps"), onPress: () => void openNativeMaps() },
+      { text: t("googleMaps"), onPress: () => void openGoogleMaps() },
     ]);
   };
 
@@ -131,10 +134,10 @@ export default function CourtCard({
           <View style={styles.topOverlay}>
             <View style={styles.tagRow}>
               <View style={styles.greenTag}>
-                <Text style={styles.tagText}>Đơn ngày</Text>
+                <Text style={styles.tagText}>{t("courtTagDaily")}</Text>
               </View>
               <View style={styles.pinkTag}>
-                <Text style={styles.tagText}>Sự kiện</Text>
+                <Text style={styles.tagText}>{t("courtTagEvent")}</Text>
               </View>
             </View>
             <View style={styles.iconActions}>
@@ -193,7 +196,7 @@ export default function CourtCard({
               style={styles.primaryBtn}
               onPress={onPrimaryAction || onPress}
             >
-              <Text style={styles.primaryBtnText}>{primaryActionLabel}</Text>
+              <Text style={styles.primaryBtnText}>{resolvedPrimaryActionLabel}</Text>
             </TouchableOpacity>
           ) : null}
         </View>

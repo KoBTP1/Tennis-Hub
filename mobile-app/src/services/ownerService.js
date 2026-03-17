@@ -53,6 +53,14 @@ export async function getOwnerCourts({ keyword = "", status = "all", page = 1, l
   return response.data;
 }
 
+export async function getOwnerCourtDetail(courtId) {
+  const headers = await getAuthHeaders();
+  const response = await axios.get(`${OWNER_ENDPOINT}/courts/${courtId}`, {
+    headers,
+  });
+  return response.data;
+}
+
 export async function createOwnerCourt(payload) {
   const headers = await getAuthHeaders();
   const response = await axios.post(`${OWNER_ENDPOINT}/courts`, payload, { headers });

@@ -27,7 +27,7 @@ function getApiErrorMessage(error, fallbackMessage) {
   return fallbackMessage;
 }
 
-export async function registerUser({ name, email, password, phone = "", role = "player" }) {
+export async function registerUser({ name, email, password, phone = "", address = "", role = "player" }) {
   try {
     const response = await axios.post(`${AUTH_ENDPOINT}/register`, {
       name: name.trim(),
@@ -35,6 +35,7 @@ export async function registerUser({ name, email, password, phone = "", role = "
       password,
       confirmPassword: password,
       phone: phone.trim(),
+      address: String(address || "").trim(),
       role,
     });
 
@@ -116,7 +117,7 @@ export async function updateSessionUser(nextUser) {
 
   try {
     const session = JSON.parse(rawSession);
-    const mergedUser = { ...(session.user || {}), ...(nextUser || {}) };
+    const mergedUser = { ...session.user, ...nextUser };
     const nextSession = { ...session, user: mergedUser };
     await AsyncStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(nextSession));
     return nextSession;
@@ -140,6 +141,47 @@ export async function updateMyProfile(payload) {
     return response.data;
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Unable to update profile."));
+  }
+}
+
+export async function uploadMyAvatar(asset) {
+  try {
+    const headers = await getAuthHeaders();
+    const formData = new FormData();
+    if (asset?.file) {
+      formData.append("avatar", asset.file);
+    } else {
+      const uri = String(asset?.uri || "").trim();
+      if (!uri) {
+        throw new Error("Avatar file is required.");
+      }
+      const ext = uri.split(".").pop() || "jpg";
+      formData.append("avatar", {
+        uri,
+        name: asset?.fileName || `avatar.${ext}`,
+        type: asset?.mimeType || "image/jpeg",
+      });
+    }
+    const response = await axios.post(`${AUTH_ENDPOINT}/me/avatar`, formData, {
+      headers: {
+        ...headers,
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to update avatar."));
+  }
+}
+
+export async function deleteMyAccount() {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await axios.delete(`${AUTH_ENDPOINT}/me`, { headers });
+    await logoutUser();
+    return response.data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to delete account."));
   }
 }
 

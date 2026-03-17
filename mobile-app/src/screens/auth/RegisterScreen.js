@@ -14,6 +14,7 @@ import { getVietnamesePhoneErrorMessage, isValidVietnamesePhone, normalizePhoneN
 const registerValidationSchema = Yup.object().shape({
   name: Yup.string().trim().required("Full name is required."),
   email: Yup.string().trim().email("Please enter a valid email address.").required("Email is required."),
+  address: Yup.string().trim().required("Address is required."),
   password: Yup.string().min(6, "Password must be at least 6 characters.").required("Password is required."),
   confirmPassword: Yup.string()
     .required("Confirm password is required.")
@@ -28,7 +29,7 @@ function getRegisterValidationMessage(errors, submitCount) {
     return "";
   }
 
-  return errors.name || errors.email || errors.phone || errors.password || errors.confirmPassword || "";
+  return errors.name || errors.email || errors.address || errors.phone || errors.password || errors.confirmPassword || "";
 }
 
 export default function RegisterScreen({ onNavigateLogin }) {
@@ -49,6 +50,7 @@ export default function RegisterScreen({ onNavigateLogin }) {
         email: values.email.trim().toLowerCase(),
         password: values.password,
         phone: normalizePhoneNumber(values.phone),
+        address: values.address.trim(),
         role: "player",
       });
       setSuccessMessage("Account created successfully. Redirecting to Sign In...");
@@ -73,7 +75,7 @@ export default function RegisterScreen({ onNavigateLogin }) {
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Join us to book your tennis court</Text>
 
       <Formik
-        initialValues={{ name: "", email: "", phone: "", password: "", confirmPassword: "" }}
+        initialValues={{ name: "", email: "", address: "", phone: "", password: "", confirmPassword: "" }}
         validationSchema={registerValidationSchema}
         validateOnBlur
         validateOnChange={false}
@@ -137,6 +139,22 @@ export default function RegisterScreen({ onNavigateLogin }) {
               }}
               onBlur={() => setFieldTouched("phone", true)}
               keyboardType="phone-pad"
+              editable={!isSubmitting}
+            />
+
+            <InputField
+              label="Address"
+              placeholder="Enter your address"
+              leftIcon="🏠"
+              value={values.address}
+              onChangeText={(text) => {
+                if (errorMessage || successMessage) {
+                  setErrorMessage("");
+                  setSuccessMessage("");
+                }
+                setFieldValue("address", text);
+              }}
+              onBlur={() => setFieldTouched("address", true)}
               editable={!isSubmitting}
             />
 

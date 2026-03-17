@@ -20,6 +20,18 @@ export default function AdminMainScreen() {
   const { theme } = useTheme();
   const [activeScreenKey, setActiveScreenKey] = useState("dashboard");
   const [selectedCourtId, setSelectedCourtId] = useState(null);
+  const [favoriteByCourtId, setFavoriteByCourtId] = useState({});
+
+  const syncFavoriteState = (courtId, isFavorited) => {
+    const key = String(courtId || "").trim();
+    if (!key) {
+      return;
+    }
+    setFavoriteByCourtId((prev) => ({
+      ...prev,
+      [key]: Boolean(isFavorited),
+    }));
+  };
 
   const ActiveScreen = useMemo(() => screenByKey[activeScreenKey] || AdminDashboardScreen, [activeScreenKey]);
 
@@ -32,6 +44,8 @@ export default function AdminMainScreen() {
       <View style={styles.content}>
         <ActiveScreen
           onNavigate={setActiveScreenKey}
+          favoriteOverrides={favoriteByCourtId}
+          onFavoriteStateChange={syncFavoriteState}
           onOpenCourt={(courtId) => {
             setSelectedCourtId(courtId);
             setActiveScreenKey("courtDetail");
@@ -52,6 +66,8 @@ export default function AdminMainScreen() {
             {selectedCourtId ? (
               <AdminCourtDetailScreen
                 courtId={selectedCourtId}
+                forcedFavoriteState={favoriteByCourtId[String(selectedCourtId || "")]}
+                onFavoriteStateChange={syncFavoriteState}
                 onBack={() => {
                   setActiveScreenKey("courts");
                   setSelectedCourtId(null);

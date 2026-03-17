@@ -24,7 +24,7 @@ function resolveBookingImage(item) {
   return matchedFallback ? normalizeImageUrl(matchedFallback) : "";
 }
 
-export default function OwnerBookingsScreen({ onTabPress }) {
+export default function OwnerBookingsScreen({ onTabPress, onNavigate }) {
   const { theme } = useTheme();
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [bookings, setBookings] = useState([]);
@@ -68,7 +68,7 @@ export default function OwnerBookingsScreen({ onTabPress }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <RoleTopBar />
+      <RoleTopBar onAvatarPress={() => onNavigate?.("edit-profile")} />
       <ScreenContainer>
         <Card style={styles.filters}>
           {filters.map((filter) => (

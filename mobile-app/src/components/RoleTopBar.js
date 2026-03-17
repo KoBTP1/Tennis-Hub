@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Alert, Image, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, Modal, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -10,7 +10,7 @@ import { normalizeImageUrl } from "../utils/imageUrl";
 import NotificationCenter from "./NotificationCenter";
 import AssistantCenter from "./AssistantCenter";
 
-export default function RoleTopBar({ onBack = null }) {
+export default function RoleTopBar({ onBack = null, onAvatarPress = null }) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const { language, setLanguage, t } = useLanguage();
@@ -18,6 +18,7 @@ export default function RoleTopBar({ onBack = null }) {
   const topInset = Math.max(insets.top || 0, Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0);
   const [isNotificationVisible, setIsNotificationVisible] = useState(false);
   const [isAssistantVisible, setIsAssistantVisible] = useState(false);
+  const [isLanguageVisible, setIsLanguageVisible] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const greetingName = user?.name || "User";
   const dateLocale = language === "en" ? "en-US" : "vi-VN";
@@ -80,7 +81,12 @@ export default function RoleTopBar({ onBack = null }) {
               <Ionicons name="arrow-back" size={16} color="#065f46" />
             </TouchableOpacity>
           ) : null}
-          <View style={styles.avatarWrap}>
+          <TouchableOpacity
+            style={styles.avatarWrap}
+            activeOpacity={onAvatarPress ? 0.8 : 1}
+            onPress={onAvatarPress || undefined}
+            disabled={!onAvatarPress}
+          >
             {avatarUrl ? (
               <Image source={{ uri: avatarUrl }} style={styles.avatarImage} resizeMode="cover" />
             ) : (
@@ -88,7 +94,7 @@ export default function RoleTopBar({ onBack = null }) {
                 <Text style={styles.avatarFallbackText}>{String(greetingName).slice(0, 1).toUpperCase()}</Text>
               </View>
             )}
-          </View>
+          </TouchableOpacity>
           <View>
             <Text style={styles.headerDate}>{greetingDate}</Text>
             <Text style={styles.headerName}>{greetingName}</Text>
@@ -104,15 +110,24 @@ export default function RoleTopBar({ onBack = null }) {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.languageBtn}
-            onPress={() =>
-              Alert.alert(t("languageTitle"), t("languagePrompt"), [
-                { text: t("vietnamese"), onPress: () => setLanguage("vi") },
-                { text: t("english"), onPress: () => setLanguage("en") },
-                { text: t("cancel"), style: "cancel" },
-              ])
-            }
+            onPress={() => setIsLanguageVisible(true)}
           >
-            <Text style={styles.languageStar}>★</Text>
+            {language === "vi" ? (
+              <View style={styles.flagCircleViOuter}>
+                <View style={styles.flagCircleVi}>
+                  <Text style={styles.flagCircleViStar}>★</Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.flagCircleEnOuter}>
+                <View style={styles.flagCircleEn}>
+                  <View style={styles.flagEnCrossHorizontalWhite} />
+                  <View style={styles.flagEnCrossVerticalWhite} />
+                  <View style={styles.flagEnCrossHorizontalRed} />
+                  <View style={styles.flagEnCrossVerticalRed} />
+                </View>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </LinearGradient>
@@ -129,6 +144,44 @@ export default function RoleTopBar({ onBack = null }) {
           setIsAssistantVisible(false);
         }}
       />
+      <Modal visible={isLanguageVisible} transparent animationType="fade" onRequestClose={() => setIsLanguageVisible(false)}>
+        <View style={styles.langModalBackdrop}>
+          <TouchableOpacity style={styles.langDismissLayer} activeOpacity={1} onPress={() => setIsLanguageVisible(false)} />
+          <View style={styles.langModalCard}>
+            <TouchableOpacity
+              style={[styles.langOption, { borderColor: "#e5e7eb", backgroundColor: language === "vi" ? "#f3f4f6" : "#ffffff" }]}
+              onPress={() => {
+                setLanguage("vi");
+                setIsLanguageVisible(false);
+              }}
+            >
+              <View style={styles.flagCircleViOuterSmall}>
+                <View style={styles.flagCircleViSmall}>
+                  <Text style={styles.flagCircleViStarSmall}>★</Text>
+                </View>
+              </View>
+              <Text style={styles.langOptionText}>{t("vietnamese")}</Text>
+              {language === "vi" ? <Ionicons name="checkmark-circle" size={20} color="#1d4ed8" /> : null}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.langOption, styles.langOptionLast, { borderColor: "#e5e7eb", backgroundColor: language === "en" ? "#f3f4f6" : "#ffffff" }]}
+              onPress={() => {
+                setLanguage("en");
+                setIsLanguageVisible(false);
+              }}
+            >
+              <View style={styles.langMiniFlagEn}>
+                <View style={styles.flagEnCrossHorizontalWhite} />
+                <View style={styles.flagEnCrossVerticalWhite} />
+                <View style={styles.flagEnCrossHorizontalRed} />
+                <View style={styles.flagEnCrossVerticalRed} />
+              </View>
+              <Text style={styles.langOptionText}>{t("english")}</Text>
+              {language === "en" ? <Ionicons name="checkmark-circle" size={20} color="#1d4ed8" /> : null}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -189,12 +242,155 @@ const styles = StyleSheet.create({
     backgroundColor: "#ef4444",
   },
   languageBtn: {
-    width: 28,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  flagCircleViOuter: {
+    width: 22,
     height: 22,
-    borderRadius: 3,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.85)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  flagCircleEnOuter: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.85)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  flagCircleEn: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#1d4ed8",
+    overflow: "hidden",
+    position: "relative",
+  },
+  flagCircleVi: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: "#da251d",
     alignItems: "center",
     justifyContent: "center",
   },
-  languageStar: { color: "#ffde00", fontSize: 14, fontWeight: "800", lineHeight: 16 },
+  flagCircleViStar: {
+    color: "#ffde00",
+    fontSize: 10,
+    fontWeight: "800",
+    lineHeight: 12,
+  },
+  flagCircleViOuterSmall: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  flagCircleViSmall: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#da251d",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  flagCircleViStarSmall: {
+    color: "#ffde00",
+    fontSize: 10,
+    fontWeight: "800",
+    lineHeight: 12,
+  },
+  langModalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(2, 6, 23, 0.18)",
+    alignItems: "flex-end",
+    justifyContent: "flex-start",
+    paddingTop: 58,
+    paddingRight: 10,
+  },
+  langDismissLayer: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  },
+  langModalCard: {
+    width: 190,
+    borderRadius: 10,
+    borderWidth: 1,
+    backgroundColor: "#ffffff",
+    borderColor: "#d1d5db",
+    padding: 8,
+    shadowColor: "#020617",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 2,
+  },
+  langOption: {
+    borderBottomWidth: 1,
+    minHeight: 44,
+    paddingHorizontal: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  langOptionLast: { borderBottomWidth: 0 },
+  langOptionText: { flex: 1, fontSize: 15, fontWeight: "700", color: "#14532d" },
+  langMiniFlagEn: {
+    width: 22,
+    height: 16,
+    borderRadius: 2,
+    backgroundColor: "#1d4ed8",
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    overflow: "hidden",
+    position: "relative",
+  },
+  flagEnCrossHorizontalWhite: {
+    position: "absolute",
+    top: 6,
+    left: 0,
+    right: 0,
+    height: 4,
+    backgroundColor: "#ffffff",
+  },
+  flagEnCrossVerticalWhite: {
+    position: "absolute",
+    left: 8,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    backgroundColor: "#ffffff",
+  },
+  flagEnCrossHorizontalRed: {
+    position: "absolute",
+    top: 7,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: "#dc2626",
+  },
+  flagEnCrossVerticalRed: {
+    position: "absolute",
+    left: 9,
+    top: 0,
+    bottom: 0,
+    width: 2,
+    backgroundColor: "#dc2626",
+  },
 });
