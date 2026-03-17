@@ -47,13 +47,11 @@ async function getCourts(req, res, next) {
       page: parsePositiveInt(req.query.page, 1),
       limit: parsePositiveInt(req.query.limit, 20, 100),
     });
-    return res
-      .status(200)
-      .json({
-        success: true,
-        data: result.items,
-        pagination: result.pagination,
-      });
+    return res.status(200).json({
+      success: true,
+      data: result.items,
+      pagination: result.pagination,
+    });
   } catch (error) {
     return next(error);
   }
@@ -83,13 +81,11 @@ async function createCourt(req, res, next) {
       ownerId: req.user.userId,
       payload: req.body,
     });
-    return res
-      .status(201)
-      .json({
-        success: true,
-        message: "Court created successfully.",
-        data: court,
-      });
+    return res.status(201).json({
+      success: true,
+      message: "Court created successfully.",
+      data: court,
+    });
   } catch (error) {
     return next(error);
   }
@@ -107,13 +103,11 @@ async function patchCourt(req, res, next) {
       courtId: req.params.id,
       payload: req.body,
     });
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "Court updated successfully.",
-        data: court,
-      });
+    return res.status(200).json({
+      success: true,
+      message: "Court updated successfully.",
+      data: court,
+    });
   } catch (error) {
     return next(error);
   }
@@ -130,13 +124,11 @@ async function deleteCourt(req, res, next) {
       ownerId: req.user.userId,
       courtId: req.params.id,
     });
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "Court deleted successfully.",
-        data: result,
-      });
+    return res.status(200).json({
+      success: true,
+      message: "Court deleted successfully.",
+      data: result,
+    });
   } catch (error) {
     return next(error);
   }
@@ -150,12 +142,10 @@ async function getSlots(req, res, next) {
         .json({ success: false, message: "Invalid court id." });
     }
     if (req.query.date && !isValidDateString(req.query.date)) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "date must be in YYYY-MM-DD format.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "date must be in YYYY-MM-DD format.",
+      });
     }
 
     const slots = await ownerService.listOwnerSlots({
@@ -177,12 +167,10 @@ async function createSlot(req, res, next) {
         .json({ success: false, message: "Invalid court id." });
     }
     if (req.body?.date && !isValidDateString(req.body.date)) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "date must be in YYYY-MM-DD format.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "date must be in YYYY-MM-DD format.",
+      });
     }
 
     const slot = await ownerService.createOwnerSlot({
@@ -190,13 +178,11 @@ async function createSlot(req, res, next) {
       courtId: req.params.id,
       payload: req.body,
     });
-    return res
-      .status(201)
-      .json({
-        success: true,
-        message: "Slot created successfully.",
-        data: slot,
-      });
+    return res.status(201).json({
+      success: true,
+      message: "Slot created successfully.",
+      data: slot,
+    });
   } catch (error) {
     return next(error);
   }
@@ -210,12 +196,10 @@ async function patchSlot(req, res, next) {
         .json({ success: false, message: "Invalid slot id." });
     }
     if (req.body?.date && !isValidDateString(req.body.date)) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "date must be in YYYY-MM-DD format.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "date must be in YYYY-MM-DD format.",
+      });
     }
 
     const slot = await ownerService.updateOwnerSlot({
@@ -223,13 +207,11 @@ async function patchSlot(req, res, next) {
       slotId: req.params.id,
       payload: req.body,
     });
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "Slot updated successfully.",
-        data: slot,
-      });
+    return res.status(200).json({
+      success: true,
+      message: "Slot updated successfully.",
+      data: slot,
+    });
   } catch (error) {
     return next(error);
   }
@@ -246,13 +228,11 @@ async function deleteSlot(req, res, next) {
       ownerId: req.user.userId,
       slotId: req.params.id,
     });
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "Slot deleted successfully.",
-        data: result,
-      });
+    return res.status(200).json({
+      success: true,
+      message: "Slot deleted successfully.",
+      data: result,
+    });
   } catch (error) {
     return next(error);
   }
@@ -273,13 +253,11 @@ async function getBookings(req, res, next) {
       page: parsePositiveInt(req.query.page, 1),
       limit: parsePositiveInt(req.query.limit, 20, 100),
     });
-    return res
-      .status(200)
-      .json({
-        success: true,
-        data: result.items,
-        pagination: result.pagination,
-      });
+    return res.status(200).json({
+      success: true,
+      data: result.items,
+      pagination: result.pagination,
+    });
   } catch (error) {
     return next(error);
   }
@@ -297,13 +275,11 @@ async function patchBookingStatus(req, res, next) {
       bookingId: req.params.id,
       status: req.body.status,
     });
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "Booking updated successfully.",
-        data: booking,
-      });
+    return res.status(200).json({
+      success: true,
+      message: "Booking updated successfully.",
+      data: booking,
+    });
   } catch (error) {
     return next(error);
   }
