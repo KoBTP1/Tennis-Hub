@@ -65,6 +65,29 @@ export async function getAdminCourts({ token, keyword = "", status = "all", page
   }
 }
 
+export async function getAdminCourtDetail({ token, courtId }) {
+  try {
+    const response = await axios.get(`${ADMIN_ENDPOINT}/courts/${courtId}`, {
+      headers: buildAuthHeaders(token),
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to load court detail."));
+  }
+}
+
+export async function getAdminCourtSlots({ token, courtId, date = "" }) {
+  try {
+    const response = await axios.get(`${ADMIN_ENDPOINT}/courts/${courtId}/slots`, {
+      headers: buildAuthHeaders(token),
+      params: { date },
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to load court slots."));
+  }
+}
+
 export async function updateAdminCourtStatus({ token, courtId, status }) {
   try {
     const response = await axios.patch(

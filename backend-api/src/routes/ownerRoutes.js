@@ -10,6 +10,7 @@ router.use(protect, authorizeRoles("owner"));
 router.get("/dashboard", ownerController.getDashboard);
 
 router.get("/courts", ownerController.getCourts);
+router.get("/courts/:id", ownerController.getCourtDetail);
 router.post("/courts", ownerController.createCourt);
 router.patch("/courts/:id", ownerController.patchCourt);
 router.delete("/courts/:id", ownerController.deleteCourt);

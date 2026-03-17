@@ -78,7 +78,7 @@ export default function AdminReportsScreen({ onNavigate }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <RoleTopBar />
+      <RoleTopBar onBack={() => onNavigate?.("dashboard")} onAvatarPress={() => onNavigate?.("editProfile")} />
       <ScreenContainer>
         <Text style={[styles.section, { color: primaryTextColor }]}>Overview</Text>
         <View style={styles.gridRow}>

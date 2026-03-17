@@ -10,6 +10,8 @@ router.get("/users", adminController.getUsers);
 router.patch("/users/:id/status", adminController.patchUserStatus);
 
 router.get("/courts", adminController.getCourts);
+router.get("/courts/:id", adminController.getCourtDetail);
+router.get("/courts/:id/slots", adminController.getCourtSlots);
 router.patch("/courts/:id/status", adminController.patchCourtStatus);
 
 router.get("/reports/overview", adminController.getOverviewReport);

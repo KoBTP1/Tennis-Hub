@@ -2,6 +2,7 @@ import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
+import { useLanguage } from "../context/LanguageContext";
 import { radius } from "../styles/theme";
 
 const iconByTab = {
@@ -28,6 +29,17 @@ const activeIconByTab = {
 
 export default function TabBar({ tabs, active, onTabPress }) {
   const { theme } = useTheme();
+  const { t } = useLanguage();
+  const labelByTab = {
+    Home: t("tabHome"),
+    Search: t("tabSearch"),
+    Manage: t("tabManage"),
+    Courts: t("tabCourts"),
+    Schedule: t("tabSchedule"),
+    Bookings: t("tabBookings"),
+    Profile: t("tabProfile"),
+    Settings: t("tabSettings"),
+  };
   return (
     <View style={[styles.wrap, { borderTopColor: theme.border, backgroundColor: theme.card }]}>
       {tabs.map((tab) => (
@@ -38,7 +50,7 @@ export default function TabBar({ tabs, active, onTabPress }) {
             color={tab === active ? theme.success : theme.textSecondary}
           />
           <Text style={[styles.text, { color: theme.textSecondary }, tab === active ? { color: theme.success, fontWeight: "700" } : null]}>
-            {tab}
+            {labelByTab[tab] || tab}
           </Text>
         </TouchableOpacity>
       ))}

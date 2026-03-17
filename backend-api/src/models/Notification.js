@@ -15,7 +15,14 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["court_liked", "court_status_changed", "booking_created", "booking_status_changed"],
+      enum: [
+        "court_liked",
+        "court_status_changed",
+        "booking_created",
+        "booking_status_changed",
+        "court_submitted",
+        "court_slots_expired",
+      ],
       required: true,
       index: true,
     },

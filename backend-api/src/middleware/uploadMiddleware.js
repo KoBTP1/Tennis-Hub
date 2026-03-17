@@ -4,6 +4,8 @@ const multer = require("multer");
 
 const uploadRoot = path.resolve(__dirname, "../../uploads/courts");
 fs.mkdirSync(uploadRoot, { recursive: true });
+const avatarUploadRoot = path.resolve(__dirname, "../../uploads/avatars");
+fs.mkdirSync(avatarUploadRoot, { recursive: true });
 
 const storage = multer.diskStorage({
   destination: uploadRoot,
@@ -11,6 +13,16 @@ const storage = multer.diskStorage({
     const ext = path.extname(file.originalname || "").toLowerCase() || ".jpg";
     const safeExt = [".jpg", ".jpeg", ".png", ".webp"].includes(ext) ? ext : ".jpg";
     const uniqueName = `court-${Date.now()}-${Math.round(Math.random() * 1e9)}${safeExt}`;
+    callback(null, uniqueName);
+  },
+});
+
+const avatarStorage = multer.diskStorage({
+  destination: avatarUploadRoot,
+  filename(req, file, callback) {
+    const ext = path.extname(file.originalname || "").toLowerCase() || ".jpg";
+    const safeExt = [".jpg", ".jpeg", ".png", ".webp"].includes(ext) ? ext : ".jpg";
+    const uniqueName = `avatar-${Date.now()}-${Math.round(Math.random() * 1e9)}${safeExt}`;
     callback(null, uniqueName);
   },
 });
@@ -31,6 +43,15 @@ const uploadCourtImage = multer({
   },
 });
 
+const uploadAvatarImage = multer({
+  storage: avatarStorage,
+  fileFilter,
+  limits: {
+    fileSize: 3 * 1024 * 1024,
+  },
+});
+
 module.exports = {
   uploadCourtImage,
+  uploadAvatarImage,
 };

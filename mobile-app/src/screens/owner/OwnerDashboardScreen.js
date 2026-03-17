@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Card from "../../components/Card";
 import GradientBackground from "../../components/GradientBackground";
 import GradientButton from "../../components/GradientButton";
-import RoleTopBar from "../../components/RoleTopBar";
 import ScreenContainer from "../../components/ScreenContainer";
 import StatCard from "../../components/StatCard";
 import { useAuth } from "../../context/AuthContext";
@@ -15,6 +15,8 @@ import { formatVND } from "../../utils/currency";
 export default function OwnerDashboardScreen({ onNavigate }) {
   const { user, logout } = useAuth();
   const { theme, isDarkMode } = useTheme();
+  const insets = useSafeAreaInsets();
+  const heroTopInset = Platform.OS === "web" ? 4 : Math.max(insets.top, 12);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [dashboard, setDashboard] = useState({
@@ -65,18 +67,19 @@ export default function OwnerDashboardScreen({ onNavigate }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <RoleTopBar />
       <ScreenContainer>
-        <GradientBackground style={styles.hero}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{(user?.name || "O").slice(0, 1).toUpperCase()}</Text>
-          </View>
-          <View style={styles.info}>
-            <Text style={[styles.heroTitle, isDarkMode ? styles.softWhiteText : null]}>{user?.name || "Owner User"}</Text>
-            <Text style={styles.heroSub}>{user?.email || "-"}</Text>
-            <Text style={styles.heroMeta}>Role: {(user?.role || "owner").toUpperCase()}</Text>
-          </View>
-        </GradientBackground>
+        <TouchableOpacity style={{ marginTop: heroTopInset }} activeOpacity={0.9} onPress={() => onNavigate?.("edit-profile")}>
+          <GradientBackground style={styles.hero}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{(user?.name || "O").slice(0, 1).toUpperCase()}</Text>
+            </View>
+            <View style={styles.info}>
+              <Text style={[styles.heroTitle, isDarkMode ? styles.softWhiteText : null]}>{user?.name || "Owner User"}</Text>
+              <Text style={styles.heroSub}>{user?.email || "-"}</Text>
+              <Text style={styles.heroMeta}>Role: {(user?.role || "owner").toUpperCase()}</Text>
+            </View>
+          </GradientBackground>
+        </TouchableOpacity>
 
         <View style={styles.gridRow}>
           <StatCard value={dashboard.totals.courts} label="My Courts" accent={colors.success} iconName="tennisball-outline" />

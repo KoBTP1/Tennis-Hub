@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Card from "../../components/Card";
-import GradientBackground from "../../components/GradientBackground";
 import GradientButton from "../../components/GradientButton";
 import RoleTopBar from "../../components/RoleTopBar";
 import ScreenContainer from "../../components/ScreenContainer";
@@ -13,8 +12,8 @@ import { colors } from "../../styles/theme";
 import { formatVND } from "../../utils/currency";
 
 export default function AdminDashboardScreen({ onNavigate }) {
-  const { user, token, logout } = useAuth();
-  const { theme, isDarkMode } = useTheme();
+  const { token, logout } = useAuth();
+  const { theme } = useTheme();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isLoadingOverview, setIsLoadingOverview] = useState(true);
   const [overview, setOverview] = useState({
@@ -68,19 +67,8 @@ export default function AdminDashboardScreen({ onNavigate }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <RoleTopBar />
+      <RoleTopBar onAvatarPress={() => onNavigate?.("editProfile")} />
       <ScreenContainer>
-        <GradientBackground style={styles.hero}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{(user?.name || "A").slice(0, 1).toUpperCase()}</Text>
-          </View>
-          <View style={styles.info}>
-            <Text style={[styles.heroTitle, isDarkMode ? styles.softWhiteText : null]}>{user?.name || "Admin User"}</Text>
-            <Text style={styles.heroSub}>{user?.email || "-"}</Text>
-            <Text style={styles.heroMeta}>Role: {(user?.role || "admin").toUpperCase()}</Text>
-          </View>
-        </GradientBackground>
-
         <View style={styles.gridRow}>
           <StatCard value={overview.totals.users} label="Total Users" subtitle="From database" accent={colors.info} iconName="people-outline" />
           <StatCard value={overview.totals.courts} label="Total Courts" subtitle="From database" accent={colors.success} iconName="tennisball-outline" />
@@ -119,14 +107,6 @@ export default function AdminDashboardScreen({ onNavigate }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  hero: { flexDirection: "row", gap: 12, borderRadius: 12, padding: 12 },
-  avatar: { width: 60, height: 60, borderRadius: 30, backgroundColor: colors.successSoft, alignItems: "center", justifyContent: "center" },
-  avatarText: { fontSize: 28, fontWeight: "800", color: colors.success },
-  info: { flex: 1 },
-  heroTitle: { color: colors.white, fontSize: 28, fontWeight: "800" },
-  heroSub: { color: colors.infoSoft, marginTop: 4, fontSize: 14 },
-  heroMeta: { color: "#e5e7eb", marginTop: 5, fontSize: 13, fontWeight: "600" },
-  softWhiteText: { color: "#E5E5E5" },
   gridRow: { flexDirection: "row", gap: 10 },
   section: { fontSize: 26, fontWeight: "700", color: colors.textPrimary, marginTop: 8 },
   actionCard: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 18 },

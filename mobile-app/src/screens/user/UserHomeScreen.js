@@ -1,15 +1,14 @@
-import React, { useEffect, useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Card from "../../components/Card";
 import CourtCard from "../../components/CourtCard";
 import RoleTopBar from "../../components/RoleTopBar";
 import ScreenContainer from "../../components/ScreenContainer";
 import TabBar from "../../components/TabBar";
 import { API_BASE_URL } from "../../config/api";
+import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { searchCourts, toggleCourtFavorite } from "../../services/courtService";
-import { LinearGradient } from "expo-linear-gradient";
 import { colors, radius } from "../../styles/theme";
 import { formatVNDPerHour } from "../../utils/currency";
 function getPalette(isDarkMode) {
@@ -54,13 +53,23 @@ function resolveCourtImageUrl(inputUrl) {
   return `${apiOrigin}/${raw}`;
 }
 
-export default function UserHomeScreen({ onTabPress, onOpenCourt }) {
+export default function UserHomeScreen({
+  onTabPress,
+  onOpenCourt,
+  onNavigate,
+  favoritesRevision = 0,
+  onFavoriteChanged,
+  favoriteOverrides = {},
+  onFavoriteStateChange,
+}) {
   const { isDarkMode, theme } = useTheme();
+  const { t, language } = useLanguage();
   const palette = getPalette(isDarkMode);
   const [courts, setCourts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [favoriteIds, setFavoriteIds] = useState([]);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -102,54 +111,79 @@ export default function UserHomeScreen({ onTabPress, onOpenCourt }) {
       mounted = false;
       clearTimeout(timer);
     };
-  }, [searchKeyword]);
+  }, [searchKeyword, favoritesRevision]);
+
+  const decoratedCourts = useMemo(
+    () =>
+      courts.map((court) => {
+        const courtId = court._id || court.id;
+        const favoriteKey = String(courtId || "");
+        const hasOverride = Object.hasOwn(favoriteOverrides, favoriteKey);
+        const isFavorite = hasOverride ? Boolean(favoriteOverrides[favoriteKey]) : favoriteIds.includes(favoriteKey);
+        return { court, courtId, isFavorite };
+      }),
+    [courts, favoriteOverrides, favoriteIds]
+  );
+
+  const visibleCourts = useMemo(
+    () => (showFavoritesOnly ? decoratedCourts.filter((item) => item.isFavorite) : decoratedCourts),
+    [decoratedCourts, showFavoritesOnly]
+  );
 
   return (
     <View style={[styles.root, { backgroundColor: palette.background }]}>
-      <RoleTopBar />
+      <RoleTopBar onAvatarPress={() => onNavigate?.("edit-profile")} />
 
       <KeyboardAvoidingView style={styles.keyboardAvoiding} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScreenContainer contentStyle={styles.content} backgroundColor={palette.background}>
-          <LinearGradient colors={[theme.gradientStart, theme.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.hero}>
-            <Text style={[styles.heroTitle, isDarkMode ? styles.softWhiteText : null]}>Find Your Court</Text>
-            <Text style={styles.heroSub}>Book the perfect tennis court near you</Text>
-          </LinearGradient>
-
-          <Card style={[styles.searchCard, { backgroundColor: palette.card }]}>
-            <Ionicons name="search-outline" size={20} color="#9ca3af" />
-            <TextInput
-              value={searchKeyword}
-              onChangeText={setSearchKeyword}
-              placeholder="Search courts by name or location..."
-              placeholderTextColor="#9ca3af"
-              style={[styles.searchInput, { color: palette.textPrimary }]}
-            />
-          </Card>
+          <View style={styles.searchRow}>
+            <View style={[styles.searchWrap, { backgroundColor: palette.card, borderColor: palette.border }]}>
+              <Ionicons name="search-outline" size={18} color="#9ca3af" />
+              <TextInput
+                value={searchKeyword}
+                onChangeText={setSearchKeyword}
+                placeholder={t("homeSearchPlaceholder")}
+                placeholderTextColor="#9ca3af"
+                style={[styles.searchInput, { color: palette.textPrimary }]}
+              />
+              <Ionicons name="scan-outline" size={18} color={theme.success} />
+            </View>
+            <TouchableOpacity
+              style={[styles.heartBtn, { borderColor: palette.border, backgroundColor: palette.card }]}
+              onPress={() => setShowFavoritesOnly((prev) => !prev)}
+            >
+              <Ionicons name={showFavoritesOnly ? "heart" : "heart-outline"} size={20} color={theme.success} />
+            </TouchableOpacity>
+          </View>
 
           <View style={styles.sectionRow}>
             <View style={styles.sectionTitleWrap}>
               <Ionicons name="location-outline" size={18} color={colors.success} />
-              <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>Nearby Courts</Text>
+              <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>
+                {showFavoritesOnly ? (language === "en" ? "Favorites" : "Sân đã tym") : t("homeNearbyCourts")}
+              </Text>
             </View>
-            <Text style={styles.link}>{courts.length} courts</Text>
+            <Text style={styles.link}>{`${visibleCourts.length} ${t("homeCourtsCount")}`}</Text>
           </View>
 
           {isLoading ? <ActivityIndicator size="small" color={theme.info} /> : null}
-          {!isLoading && courts.length === 0 ? (
-            <Text style={[styles.emptyText, { color: palette.textSecondary }]}>No courts found.</Text>
+          {!isLoading && visibleCourts.length === 0 ? (
+            <Text style={[styles.emptyText, { color: palette.textSecondary }]}>{t("homeNoCourtsFound")}</Text>
           ) : null}
           {!isLoading &&
-            courts.map((court) => {
-              const courtId = court._id || court.id;
+            visibleCourts.map(({ court, courtId, isFavorite }) => {
               const images = Array.isArray(court.images)
                 ? court.images.map((item) => resolveCourtImageUrl(item)).filter(Boolean)
                 : [];
-              const isFavorite = favoriteIds.includes(String(courtId));
               return (
                 <CourtCard
                   key={courtId || court.name}
                   name={court.name}
-                  location={court.location}
+                  location={
+                    language === "en"
+                      ? court.locationEn || court.locationVi || court.location
+                      : court.locationVi || court.location || court.locationEn
+                  }
                   mapUrl={court.mapUrl}
                   price={formatVNDPerHour(court.pricePerHour || 0)}
                   imageUrl={images[0] || ""}
@@ -162,6 +196,7 @@ export default function UserHomeScreen({ onTabPress, onOpenCourt }) {
                       ? previous.filter((item) => item !== id)
                       : [...previous, id];
                     setFavoriteIds(optimistic);
+                    onFavoriteStateChange?.(id, optimistic.includes(id));
                     try {
                       const response = await toggleCourtFavorite(courtId);
                       const serverFavorite = Boolean(response?.data?.isFavorited);
@@ -174,8 +209,11 @@ export default function UserHomeScreen({ onTabPress, onOpenCourt }) {
                         }
                         return prev;
                       });
+                      onFavoriteStateChange?.(id, serverFavorite);
+                      onFavoriteChanged?.();
                     } catch {
                       setFavoriteIds(previous);
+                      onFavoriteStateChange?.(id, previous.includes(id));
                     }
                   }}
                   showPrimaryAction={false}
@@ -193,16 +231,30 @@ export default function UserHomeScreen({ onTabPress, onOpenCourt }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   keyboardAvoiding: { flex: 1 },
-  softWhiteText: { color: "#E5E5E5" },
   content: { paddingTop: 12, paddingHorizontal: 12, paddingBottom: 24 },
-  hero: { borderRadius: radius.md, padding: 18 },
-  heroTitle: { color: colors.white, fontSize: 46, fontWeight: "800" },
-  heroSub: { color: "#dbeafe", marginTop: 6, fontSize: 18 },
-  searchCard: { paddingVertical: 8, flexDirection: "row", alignItems: "center", gap: 8 },
+  searchRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  searchWrap: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: 12,
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  heartBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   searchInput: { color: colors.textPrimary, fontSize: 17, minHeight: 38, flex: 1 },
   sectionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 2 },
   sectionTitleWrap: { flexDirection: "row", alignItems: "center", gap: 6 },
-  sectionTitle: { fontSize: 34, fontWeight: "800", color: colors.textPrimary },
+  sectionTitle: { fontSize: 32, fontWeight: "800", color: colors.textPrimary },
   link: { color: colors.success, fontWeight: "700", fontSize: 16 },
   emptyText: { textAlign: "center", marginTop: 4, marginBottom: 8, fontSize: 15 },
 });

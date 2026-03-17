@@ -9,10 +9,10 @@ function validateEmail(email) {
 
 async function register(req, res, next) {
   try {
-    const { name, email, password, confirmPassword, phone = "" } = req.body;
+    const { name, email, password, confirmPassword, phone = "", address = "" } = req.body;
 
-    if (!name || !email || !password || !confirmPassword) {
-      return res.status(400).json({ message: "name, email, password, confirmPassword are required." });
+    if (!name || !email || !password || !confirmPassword || !String(address || "").trim()) {
+      return res.status(400).json({ message: "name, email, address, password, confirmPassword are required." });
     }
 
     if (!validateEmail(email)) {
@@ -32,7 +32,14 @@ async function register(req, res, next) {
       return res.status(400).json({ message: "Phone must be 9-15 digits and may start with '+'." });
     }
 
-    const result = await authService.register({ name, email, password, phone: normalizedPhone, role: "player" });
+    const result = await authService.register({
+      name,
+      email,
+      password,
+      phone: normalizedPhone,
+      address: String(address || "").trim(),
+      role: "player",
+    });
     return res.status(201).json(result);
   } catch (error) {
     return next(error);
@@ -68,7 +75,7 @@ async function getMe(req, res, next) {
 }
 
 function normalizePhone(phone) {
-  return String(phone || "").trim().replace(/[\s-]/g, "");
+  return String(phone || "").trim().replaceAll(/[\s-]/g, "");
 }
 
 function isValidPhone(phone) {
@@ -81,7 +88,7 @@ function isValidPhone(phone) {
 async function updateMe(req, res, next) {
   try {
     const userId = req.user?.userId || req.user?.id;
-    const { name, phone, currentPassword, newPassword } = req.body || {};
+    const { name, phone, address, currentPassword, newPassword } = req.body || {};
 
     if (name !== undefined && !String(name).trim()) {
       return res.status(400).json({ message: "Name cannot be empty." });
@@ -109,6 +116,7 @@ async function updateMe(req, res, next) {
     const user = await authService.updateProfile(userId, {
       name,
       phone: phone === undefined ? undefined : normalizedPhone,
+      address: address === undefined ? undefined : String(address || "").trim(),
       currentPassword,
       newPassword,
     });
@@ -117,6 +125,37 @@ async function updateMe(req, res, next) {
       success: true,
       message: "Profile updated successfully.",
       user,
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function uploadMyAvatar(req, res, next) {
+  try {
+    const userId = req.user?.userId || req.user?.id;
+    if (!req.file?.filename) {
+      return res.status(400).json({ message: "Avatar image is required." });
+    }
+    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+    const user = await authService.updateProfile(userId, { avatar: avatarUrl });
+    return res.status(200).json({
+      success: true,
+      message: "Avatar updated successfully.",
+      user,
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function deleteMe(req, res, next) {
+  try {
+    const userId = req.user?.userId || req.user?.id;
+    await authService.deleteAccount(userId);
+    return res.status(200).json({
+      success: true,
+      message: "Account deleted permanently.",
     });
   } catch (error) {
     return next(error);
@@ -167,6 +206,8 @@ module.exports = {
   login,
   getMe,
   updateMe,
+  deleteMe,
+  uploadMyAvatar,
   forgotPassword,
   resetPassword,
 };

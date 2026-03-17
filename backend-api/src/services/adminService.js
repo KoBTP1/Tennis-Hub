@@ -1,5 +1,6 @@
 const Booking = require("../models/Booking");
 const Court = require("../models/Court");
+const CourtSlot = require("../models/CourtSlot");
 const User = require("../models/User");
 const notificationService = require("./notificationService");
 const { escapeRegex } = require("../utils/requestValidation");
@@ -188,6 +189,45 @@ async function listCourts({ keyword = "", status = "", page = 1, limit = 20 }) {
   };
 }
 
+async function getCourtDetail(courtId) {
+  const court = await Court.findOne({ _id: courtId, isDeleted: { $ne: true } })
+    .populate("ownerId", "name")
+    .lean();
+  if (!court) {
+    const error = new Error("Court not found.");
+    error.statusCode = 404;
+    throw error;
+  }
+  return court;
+}
+
+function sanitizeCourtSlot(slot) {
+  return {
+    id: slot._id.toString(),
+    courtId: slot.courtId.toString(),
+    date: slot.date,
+    startTime: slot.startTime,
+    endTime: slot.endTime,
+    isBooked: Boolean(slot.isBooked),
+    status: slot.isBooked ? "booked" : "available",
+  };
+}
+
+async function getCourtSlots(courtId, date = "") {
+  const court = await Court.findOne({ _id: courtId, isDeleted: { $ne: true } }).select("_id").lean();
+  if (!court) {
+    const error = new Error("Court not found.");
+    error.statusCode = 404;
+    throw error;
+  }
+  const query = { courtId };
+  if (date) {
+    query.date = String(date).trim();
+  }
+  const slots = await CourtSlot.find(query).sort({ date: 1, startTime: 1 }).lean();
+  return slots.map(sanitizeCourtSlot);
+}
+
 async function updateCourtStatus({ courtId, status }) {
   if (!["pending", "approved", "suspended", "rejected"].includes(status)) {
     const error = new Error("Invalid court status.");
@@ -328,6 +368,8 @@ module.exports = {
   listUsers,
   updateUserStatus,
   listCourts,
+  getCourtDetail,
+  getCourtSlots,
   updateCourtStatus,
   getOverviewReport,
   getMonthlyReport,

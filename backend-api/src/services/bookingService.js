@@ -10,6 +10,35 @@ function isTransactionNotSupportedError(error) {
   return message.includes("Transaction numbers are only allowed on a replica set member or mongos");
 }
 
+function toMinutes(timeString) {
+  const [hour, minute] = String(timeString || "").split(":").map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
+    return null;
+  }
+  return hour * 60 + minute;
+}
+
+function getSlotEndDate(slot) {
+  const dateText = String(slot?.date || "").trim();
+  const [year, month, day] = dateText.split("-").map(Number);
+  const endMinutes = toMinutes(slot?.endTime);
+  if (!year || !month || !day || endMinutes === null) {
+    return null;
+  }
+  const endHour = Math.floor(endMinutes / 60);
+  const endMinute = endMinutes % 60;
+  return new Date(year, month - 1, day, endHour, endMinute, 0, 0);
+}
+
+function ensureSlotNotExpired(slot) {
+  const endAt = getSlotEndDate(slot);
+  if (endAt && endAt <= new Date()) {
+    const error = new Error("This slot has expired.");
+    error.statusCode = 400;
+    throw error;
+  }
+}
+
 async function createBooking(userId, courtId, slotId) {
   if (!courtId || !slotId) {
     const error = new Error("courtId and slotId are required.");
@@ -29,6 +58,7 @@ async function createBooking(userId, courtId, slotId) {
       error.statusCode = 400;
       throw error;
     }
+    ensureSlotNotExpired(slot);
 
     const court = await Court.findOne({ _id: courtId, isDeleted: { $ne: true } });
     if (!court) {
@@ -111,6 +141,7 @@ async function createBooking(userId, courtId, slotId) {
         error.statusCode = 400;
         throw error;
       }
+      ensureSlotNotExpired(slot);
 
       const court = await Court.findOne({ _id: courtId, isDeleted: { $ne: true } }).session(session);
       if (!court) {

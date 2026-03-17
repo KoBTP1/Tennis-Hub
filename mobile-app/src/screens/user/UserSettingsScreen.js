@@ -1,167 +1,291 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
-import Card from "../../components/Card";
-import RoleTopBar from "../../components/RoleTopBar";
+import React, { useState } from "react";
+import { ActivityIndicator, Alert, Modal, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import ScreenContainer from "../../components/ScreenContainer";
 import { useTheme } from "../../context/ThemeContext";
-import { colors } from "../../styles/theme";
-import { getMyBookings } from "../../services/bookingService";
-
-function getPalette(isDarkMode) {
-  if (isDarkMode) {
-    return {
-      background: "#0f172a",
-      card: "#111827",
-      border: "#1e293b",
-      textPrimary: "#E5E5E5",
-      textSecondary: "#94a3b8",
-      badge: "#1d4ed8",
-    };
-  }
-
-  return {
-    background: colors.background,
-    card: colors.white,
-    border: colors.border,
-    textPrimary: colors.textPrimary,
-    textSecondary: colors.textSecondary,
-    badge: colors.info,
-  };
-}
+import { useAuth } from "../../context/AuthContext";
+import { useLanguage } from "../../context/LanguageContext";
+import { colors, radius } from "../../styles/theme";
 
 export default function UserSettingsScreen({ onBack }) {
-  const { isDarkMode, toggleTheme } = useTheme();
-  const palette = getPalette(isDarkMode);
-  const [isLoading, setIsLoading] = useState(true);
-  const [notifications, setNotifications] = useState([]);
-  const unreadCount = useMemo(() => notifications.filter((item) => !item.read).length, [notifications]);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const loadNotifications = async () => {
-      try {
-        setIsLoading(true);
-        const response = await getMyBookings();
-        const items = Array.isArray(response?.data) ? response.data : [];
-
-        const generated = items.slice(0, 8).map((booking) => {
-          const status = booking?.status || "confirmed";
-          const courtName = booking?.courtId?.name || "Court";
-          const date = booking?.slotId?.date ? String(booking.slotId.date).slice(0, 10) : "N/A";
-          const time = booking?.slotId?.startTime && booking?.slotId?.endTime ? `${booking.slotId.startTime}-${booking.slotId.endTime}` : "";
-          return {
-            id: booking?._id || `${courtName}-${date}-${time}`,
-            title: `Booking ${status}`,
-            body: `${courtName} · ${date}${time ? ` · ${time}` : ""}`,
-            time: booking?.createdAt ? new Date(booking.createdAt).toLocaleDateString() : "-",
-            read: status === "completed" || status === "cancelled",
-          };
-        });
-
-        if (!mounted) {
-          return;
-        }
-        setNotifications(generated);
-      } catch {
-        if (!mounted) {
-          return;
-        }
-        setNotifications([]);
-      } finally {
-        if (mounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadNotifications();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
+  const { logout, deleteAccount } = useAuth();
+  const { theme, isDarkMode, toggleTheme } = useTheme();
+  const { language, setLanguage, t } = useLanguage();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isLanguageModalVisible, setIsLanguageModalVisible] = useState(false);
+  const handleLogout = () => {
+    logout().catch(() => {
+      Alert.alert(t("settingsLogoutFailedTitle"), t("settingsLogoutFailedMessage"));
+    });
+  };
+  const handleToggleTheme = () => {
+    toggleTheme().catch(() => {
+      Alert.alert(t("settingsThemeFailedTitle"), t("settingsThemeFailedMessage"));
+    });
+  };
+  const languageLabel = language === "vi" ? t("vietnamese") : t("english");
+  const isVietnamese = language === "vi";
+  const applyLanguage = (nextLanguage) => {
+    setLanguage(nextLanguage);
+    setIsLanguageModalVisible(false);
+  };
+  const handleConfirmDeleteAccount = () => {
+    setIsDeleting(true);
+    deleteAccount()
+      .catch((error) => {
+        Alert.alert(t("settingsDeleteFailedTitle"), error?.message || t("settingsDeleteFailedMessage"));
+      })
+      .finally(() => {
+        setIsDeleting(false);
+      });
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.background }]}>
-      <RoleTopBar onBack={onBack} />
-      <ScreenContainer backgroundColor={palette.background}>
-        <Card style={[styles.card, { backgroundColor: palette.card }]}>
-          <View style={styles.settingRow}>
-            <View style={styles.settingTextWrap}>
-              <Text style={[styles.settingTitle, { color: palette.textPrimary }]}>Dark Mode</Text>
-              <Text style={[styles.settingSubtitle, { color: palette.textSecondary }]}>
-                Switch between light and dark appearance.
-              </Text>
+    <View style={[styles.root, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+        <TouchableOpacity onPress={onBack} style={[styles.backBtn, { backgroundColor: theme.inputBackground, borderColor: theme.border }]}>
+          <Ionicons name="chevron-back" size={20} color={theme.text} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>{t("settingsTitle")}</Text>
+      </View>
+      <ScreenContainer backgroundColor={theme.background}>
+        <View style={styles.listWrap}>
+          <TouchableOpacity style={[styles.row, { backgroundColor: theme.card, borderColor: theme.border }]} onPress={() => Alert.alert(t("notifications"), t("comingSoonContent"))}>
+            <View style={styles.rowLeft}>
+              <View style={styles.smallIconBtn}>
+                <Ionicons name="notifications-outline" size={16} color="#065f46" />
+              </View>
+              <Text style={[styles.rowLabel, { color: theme.text }]}>{t("settingsNotifications")}</Text>
             </View>
-            <Switch value={isDarkMode} onValueChange={toggleTheme} trackColor={{ true: colors.success }} />
-          </View>
-        </Card>
+            <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+          </TouchableOpacity>
 
-        <Card style={[styles.card, { backgroundColor: palette.card }]}>
-          <View style={styles.notificationHeader}>
-            <View>
-              <Text style={[styles.settingTitle, { color: palette.textPrimary }]}>Notifications</Text>
-              <Text style={[styles.settingSubtitle, { color: palette.textSecondary }]}>
-                {unreadCount} unread
-              </Text>
+          <TouchableOpacity
+            style={[styles.row, { backgroundColor: theme.card, borderColor: theme.border }]}
+            onPress={() => setIsLanguageModalVisible(true)}
+          >
+            <View style={styles.rowLeft}>
+              {isVietnamese ? (
+                <View style={[styles.flagCircle, styles.flagCircleVi]}>
+                  <Text style={styles.flagCircleViStar}>★</Text>
+                </View>
+              ) : (
+                <View style={[styles.flagCircle, styles.flagCircleEn]}>
+                  <View style={styles.flagEnCrossHorizontalWhite} />
+                  <View style={styles.flagEnCrossVerticalWhite} />
+                  <View style={styles.flagEnCrossHorizontalRed} />
+                  <View style={styles.flagEnCrossVerticalRed} />
+                </View>
+              )}
+              <Text style={[styles.rowLabel, { color: theme.text }]}>{t("settingsLanguage")}</Text>
             </View>
-            <TouchableOpacity onPress={markAllAsRead}>
-              <Text style={styles.markReadText}>Mark all as read</Text>
+            <View style={styles.rowRight}>
+              <Text style={[styles.languageText, { color: theme.textSecondary }]}>{languageLabel}</Text>
+              <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+            </View>
+          </TouchableOpacity>
+
+          <View style={[styles.row, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={styles.rowLeft}>
+              <Ionicons name={isDarkMode ? "moon-outline" : "sunny-outline"} size={20} color="#166534" />
+              <Text style={[styles.rowLabel, { color: theme.text }]}>{t("settingsTheme")}</Text>
+            </View>
+            <View style={styles.switchWrap}>
+              <Text style={[styles.languageText, { color: theme.textSecondary }]}>{isDarkMode ? t("settingsDark") : t("settingsLight")}</Text>
+              <Switch
+                value={isDarkMode}
+                onValueChange={handleToggleTheme}
+                trackColor={{ false: "#cbd5e1", true: "#93c5fd" }}
+                thumbColor={isDarkMode ? "#1d4ed8" : "#f8fafc"}
+              />
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.row, { backgroundColor: theme.card, borderColor: theme.border }]}
+            onPress={handleLogout}
+          >
+            <View style={styles.rowLeft}>
+              <Ionicons name="log-out-outline" size={20} color="#166534" />
+              <Text style={[styles.rowLabel, { color: theme.text }]}>{t("settingsLogout")}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.row, { backgroundColor: theme.card, borderColor: "#fecaca" }]}
+            disabled={isDeleting}
+            onPress={() => {
+              Alert.alert(t("settingsDeleteConfirmTitle"), t("settingsDeleteConfirmMessage"), [
+                { text: t("cancel"), style: "cancel" },
+                {
+                  text: t("settingsDeleteConfirmAction"),
+                  style: "destructive",
+                  onPress: handleConfirmDeleteAccount,
+                },
+              ]);
+            }}
+          >
+            <View style={styles.rowLeft}>
+              <Ionicons name="trash-outline" size={20} color={colors.danger} />
+              <Text style={styles.rowDanger}>{t("settingsDeleteAccount")}</Text>
+            </View>
+            {isDeleting ? <ActivityIndicator size="small" color={colors.danger} /> : <Ionicons name="chevron-forward" size={18} color={colors.danger} />}
+          </TouchableOpacity>
+        </View>
+      </ScreenContainer>
+      <Modal visible={isLanguageModalVisible} transparent animationType="fade" onRequestClose={() => setIsLanguageModalVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>{t("settingsChooseLanguage")}</Text>
+              <TouchableOpacity onPress={() => setIsLanguageModalVisible(false)}>
+                <Ionicons name="close" size={20} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={[styles.langOption, { borderColor: theme.border, backgroundColor: language === "vi" ? "#dbeafe" : theme.inputBackground }]}
+              onPress={() => applyLanguage("vi")}
+            >
+              <View style={[styles.flagCircle, styles.flagCircleVi]}>
+                <Text style={styles.flagCircleViStar}>★</Text>
+              </View>
+              <Text style={[styles.langOptionText, { color: theme.text }]}>{t("vietnamese")}</Text>
+              {language === "vi" ? <Ionicons name="checkmark-circle" size={20} color="#1d4ed8" /> : null}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.langOption, { borderColor: theme.border, backgroundColor: language === "en" ? "#dbeafe" : theme.inputBackground }]}
+              onPress={() => applyLanguage("en")}
+            >
+              <View style={[styles.flagCircle, styles.flagCircleEn]}>
+                <View style={styles.flagEnCrossHorizontalWhite} />
+                <View style={styles.flagEnCrossVerticalWhite} />
+                <View style={styles.flagEnCrossHorizontalRed} />
+                <View style={styles.flagEnCrossVerticalRed} />
+              </View>
+              <Text style={[styles.langOptionText, { color: theme.text }]}>{t("english")}</Text>
+              {language === "en" ? <Ionicons name="checkmark-circle" size={20} color="#1d4ed8" /> : null}
             </TouchableOpacity>
           </View>
-
-          {notifications.map((item, index) => (
-            <View
-              key={item.id}
-              style={[
-                styles.notificationItem,
-                { borderBottomColor: palette.border },
-                index === notifications.length - 1 ? styles.lastItem : null,
-              ]}
-            >
-              <View style={styles.notificationTextWrap}>
-                <Text style={[styles.notificationTitle, { color: palette.textPrimary }]}>{item.title}</Text>
-                <Text style={[styles.notificationBody, { color: palette.textSecondary }]}>{item.body}</Text>
-                <Text style={[styles.notificationTime, { color: palette.textSecondary }]}>{item.time}</Text>
-              </View>
-              {!item.read ? <View style={[styles.unreadDot, { backgroundColor: palette.badge }]} /> : null}
-            </View>
-          ))}
-          {!isLoading && notifications.length === 0 ? (
-            <Text style={[styles.settingSubtitle, { color: palette.textSecondary }]}>No notifications from booking history yet.</Text>
-          ) : null}
-          {isLoading ? <ActivityIndicator size="small" color={colors.info} /> : null}
-        </Card>
-      </ScreenContainer>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  card: { paddingVertical: 12 },
-  settingRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 },
-  settingTextWrap: { flex: 1 },
-  settingTitle: { fontSize: 16, fontWeight: "700" },
-  settingSubtitle: { marginTop: 4, fontSize: 13 },
-  notificationHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
-  markReadText: { color: colors.info, fontWeight: "600", fontSize: 13 },
-  notificationItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 10,
+  root: { flex: 1, backgroundColor: colors.background },
+  header: {
+    height: 62,
+    paddingHorizontal: 12,
     borderBottomWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
   },
-  lastItem: { borderBottomWidth: 0 },
-  notificationTextWrap: { flex: 1 },
-  notificationTitle: { fontSize: 14, fontWeight: "700" },
-  notificationBody: { marginTop: 2, fontSize: 13 },
-  notificationTime: { marginTop: 4, fontSize: 12 },
-  unreadDot: { width: 8, height: 8, borderRadius: 4 },
+  backBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+  headerTitle: { fontSize: 17, fontWeight: "800", flex: 1, textAlign: "center", marginRight: 40 },
+  listWrap: { gap: 12, marginTop: 6 },
+  row: {
+    height: 56,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  rowLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  rowLabel: { fontSize: 16, fontWeight: "600" },
+  rowDanger: { fontSize: 16, fontWeight: "600", color: "#ef4444" },
+  smallIconBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+  },
+  flagCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  flagCircleVi: { backgroundColor: "#da251d" },
+  flagCircleViStar: { color: "#ffde00", fontSize: 11, fontWeight: "800", lineHeight: 12 },
+  flagCircleEn: { backgroundColor: "#1d4ed8", borderWidth: 1, borderColor: "#d1d5db", position: "relative" },
+  flagEnCrossHorizontalWhite: {
+    position: "absolute",
+    top: 8,
+    left: 0,
+    right: 0,
+    height: 4,
+    backgroundColor: "#ffffff",
+  },
+  flagEnCrossVerticalWhite: {
+    position: "absolute",
+    left: 9,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    backgroundColor: "#ffffff",
+  },
+  flagEnCrossHorizontalRed: {
+    position: "absolute",
+    top: 9,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: "#dc2626",
+  },
+  flagEnCrossVerticalRed: {
+    position: "absolute",
+    left: 10,
+    top: 0,
+    bottom: 0,
+    width: 2,
+    backgroundColor: "#dc2626",
+  },
+  languageText: { fontSize: 14, fontWeight: "600" },
+  rowRight: { flexDirection: "row", alignItems: "center", gap: 4 },
+  switchWrap: { flexDirection: "row", alignItems: "center", gap: 8 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(2, 6, 23, 0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 360,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+  },
+  modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
+  modalTitle: { fontSize: 16, fontWeight: "800" },
+  langOption: {
+    borderWidth: 1,
+    borderRadius: 10,
+    minHeight: 46,
+    paddingHorizontal: 12,
+    marginTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  langOptionText: { flex: 1, fontSize: 15, fontWeight: "700", marginLeft: 8 },
 });

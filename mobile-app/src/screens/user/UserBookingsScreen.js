@@ -5,6 +5,7 @@ import Card from "../../components/Card";
 import RoleTopBar from "../../components/RoleTopBar";
 import ScreenContainer from "../../components/ScreenContainer";
 import TabBar from "../../components/TabBar";
+import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { colors, radius } from "../../styles/theme";
 import { getMyBookings, cancelBooking } from "../../services/bookingService";
@@ -32,12 +33,13 @@ function getPalette(isDarkMode) {
   };
 }
 
-export default function UserBookingsScreen({ onTabPress }) {
+export default function UserBookingsScreen({ onTabPress, onNavigate }) {
   const { isDarkMode } = useTheme();
+  const { t } = useLanguage();
   const [bookings, setBookings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeFilter, setActiveFilter] = useState("All");
+  const [activeFilter, setActiveFilter] = useState("all");
   const [payingBookingId, setPayingBookingId] = useState("");
   const palette = getPalette(isDarkMode);
 
@@ -49,7 +51,7 @@ export default function UserBookingsScreen({ onTabPress }) {
       // res is { success: true, message: "...", data: [...] } from backend
       setBookings(res.data || []);
     } catch (err) {
-      setError(err.message || "Failed to load bookings");
+      setError(err.message || t("bookingsLoadFailed"));
     } finally {
       setIsLoading(false);
     }
@@ -63,15 +65,15 @@ export default function UserBookingsScreen({ onTabPress }) {
     const performCancel = async () => {
       try {
         await cancelBooking(id);
-        Alert.alert("Success", "Booking cancelled successfully.");
+        Alert.alert(t("bookingSuccessTitle"), t("bookingsCancelSuccess"));
         await fetchBookings();
       } catch (err) {
-        Alert.alert("Error", err.message || "Failed to cancel booking.");
+        Alert.alert(t("error"), err.message || t("bookingsCancelFailed"));
       }
     };
 
     if (Platform.OS === "web") {
-      const accepted = globalThis.confirm?.("Are you sure you want to cancel this booking?");
+      const accepted = globalThis.confirm?.(t("bookingsCancelConfirm"));
       if (!accepted) {
         return;
       }
@@ -80,12 +82,12 @@ export default function UserBookingsScreen({ onTabPress }) {
     }
 
     Alert.alert(
-      "Cancel Booking",
-      "Are you sure you want to cancel this booking?",
+      t("bookingsCancelTitle"),
+      t("bookingsCancelConfirm"),
       [
-        { text: "No", style: "cancel" },
+        { text: t("no"), style: "cancel" },
         { 
-          text: "Yes", 
+          text: t("yes"), 
           style: "destructive",
           onPress: () => {
             void performCancel();
@@ -99,10 +101,10 @@ export default function UserBookingsScreen({ onTabPress }) {
     try {
       setPayingBookingId(bookingId);
       await confirmMockPayment(bookingId);
-      Alert.alert("Payment", "Mock payment confirmed successfully.");
+      Alert.alert(t("payment"), t("bookingsPaymentSuccess"));
       await fetchBookings();
     } catch (err) {
-      Alert.alert("Payment Error", err.message || "Unable to confirm payment.");
+      Alert.alert(t("bookingsPaymentError"), err.message || t("bookingsPaymentErrorMessage"));
     } finally {
       setPayingBookingId("");
     }
@@ -111,16 +113,31 @@ export default function UserBookingsScreen({ onTabPress }) {
   const upcomingBookings = bookings.filter(b => b.status === "confirmed" || b.status === "pending");
   const pastBookings = bookings.filter(b => b.status === "completed" || b.status === "cancelled");
   const filteredBookings =
-    activeFilter === "Upcoming" ? upcomingBookings : activeFilter === "Past" ? pastBookings : bookings;
+    activeFilter === "upcoming" ? upcomingBookings : activeFilter === "past" ? pastBookings : bookings;
+  const filterTabs = [
+    { key: "all", label: t("filterAll") },
+    { key: "upcoming", label: t("filterUpcoming") },
+    { key: "past", label: t("filterPast") },
+  ];
+  const formatBookingStatus = (status) => {
+    const key = String(status || "").toLowerCase();
+    const statusMap = {
+      pending: t("statusPending"),
+      confirmed: t("statusConfirmed"),
+      completed: t("statusCompleted"),
+      cancelled: t("statusCancelled"),
+    };
+    return statusMap[key] || status;
+  };
 
   return (
     <View style={[styles.root, { backgroundColor: palette.background }]}>
-      <RoleTopBar />
+      <RoleTopBar onAvatarPress={() => onNavigate?.("edit-profile")} />
       <ScreenContainer backgroundColor={palette.background}>
         <Card style={[styles.tabFilter, { backgroundColor: palette.card }]}>
-          {["All", "Upcoming", "Past"].map((tab) => (
-            <TouchableOpacity key={tab} style={[styles.filterPill, activeFilter === tab ? styles.filterPillActive : null]} onPress={() => setActiveFilter(tab)}>
-              <Text style={[styles.filterText, { color: palette.textPrimary }, activeFilter === tab ? styles.filterTextActive : null]}>{tab}</Text>
+          {filterTabs.map((tab) => (
+            <TouchableOpacity key={tab.key} style={[styles.filterPill, activeFilter === tab.key ? styles.filterPillActive : null]} onPress={() => setActiveFilter(tab.key)}>
+              <Text style={[styles.filterText, { color: palette.textPrimary }, activeFilter === tab.key ? styles.filterTextActive : null]}>{tab.label}</Text>
             </TouchableOpacity>
           ))}
         </Card>
@@ -132,10 +149,10 @@ export default function UserBookingsScreen({ onTabPress }) {
         ) : (
           <>
             <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>
-              {activeFilter === "All" ? "All Bookings" : `${activeFilter} Bookings`}
+              {activeFilter === "all" ? t("bookingsAllTitle") : `${filterTabs.find((tab) => tab.key === activeFilter)?.label || ""} ${t("bookingsTitleSuffix")}`}
             </Text>
             {filteredBookings.length === 0 ? (
-              <Text style={[styles.emptyText, { color: palette.textSecondary }]}>No bookings in this filter.</Text>
+              <Text style={[styles.emptyText, { color: palette.textSecondary }]}>{t("bookingsNoItemsInFilter")}</Text>
             ) : null}
             {filteredBookings.map((item) => {
               const dateStr = item.slotId?.date ? new Date(item.slotId.date).toDateString() : "";
@@ -143,15 +160,15 @@ export default function UserBookingsScreen({ onTabPress }) {
               const canPay =
                 item.status === "pending" &&
                 (item.paymentStatus === "unpaid" || item.paymentStatus === "failed" || !item.paymentStatus);
-              const payLabel = payingBookingId === item._id ? "Processing..." : "Confirm Payment";
+              const payLabel = payingBookingId === item._id ? t("bookingsProcessing") : t("bookingsConfirmPayment");
               return (
                 <BookingCard 
                   key={item._id} 
-                  title={item.courtId?.name || "Court"} 
+                  title={item.courtId?.name || t("court")} 
                   subtitle={dateStr}
                   time={`${item.slotId?.startTime || ""} - ${item.slotId?.endTime || ""}`}
-                  amount={item.paymentStatus === "paid" ? `Đã thanh toán ${formatVND(item.totalPrice || 0)}` : `Chưa thanh toán ${formatVND(item.totalPrice || 0)}`}
-                  status={item.status}
+                  amount={item.paymentStatus === "paid" ? `${t("paymentPaid")} ${formatVND(item.totalPrice || 0)}` : `${t("paymentUnpaid")} ${formatVND(item.totalPrice || 0)}`}
+                  status={formatBookingStatus(item.status)}
                   imageUrl={normalizeImageUrl(Array.isArray(item.courtId?.images) ? item.courtId.images[0] || "" : "")}
                   actions={
                     [
@@ -159,7 +176,7 @@ export default function UserBookingsScreen({ onTabPress }) {
                         ? [{ label: payLabel, onPress: () => handleConfirmPayment(item._id) }]
                         : []),
                       ...(canCancel
-                        ? [{ label: "Cancel Booking", type: "danger", onPress: () => handleCancelBooking(item._id) }]
+                        ? [{ label: t("bookingsCancelAction"), type: "danger", onPress: () => handleCancelBooking(item._id) }]
                         : []),
                     ]
                   } 

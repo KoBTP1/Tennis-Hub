@@ -1,6 +1,13 @@
 const bcrypt = require("bcryptjs");
-const crypto = require("crypto");
+const crypto = require("node:crypto");
+const mongoose = require("mongoose");
 const User = require("../models/User");
+const Court = require("../models/Court");
+const CourtSlot = require("../models/CourtSlot");
+const Booking = require("../models/Booking");
+const Payment = require("../models/Payment");
+const Favorite = require("../models/Favorite");
+const Notification = require("../models/Notification");
 const generateToken = require("../utils/generateToken");
 const { getNextSequence } = require("../utils/sequence");
 
@@ -10,13 +17,16 @@ function sanitizeUser(user) {
     name: user.name,
     email: user.email,
     phone: user.phone,
+    address: user.address || "",
+    avatar: user.avatar || "",
+    avatarUrl: user.avatar || "",
     role: user.role,
     status: user.isBlocked ? "blocked" : "active",
   };
 }
 
 async function register(payload) {
-  const { name, email, password, phone = "" } = payload;
+  const { name, email, password, phone = "", address = "" } = payload;
   const normalizedEmail = email.trim().toLowerCase();
 
   const existingUser = await User.findOne({ email: normalizedEmail });
@@ -35,6 +45,7 @@ async function register(payload) {
     email: normalizedEmail,
     password: hashedPassword,
     phone: phone.trim(),
+    address: String(address || "").trim(),
     role: "player",
   });
 
@@ -109,7 +120,7 @@ async function getProfile(userId) {
 }
 
 async function updateProfile(userId, payload) {
-  const { name, phone, currentPassword, newPassword } = payload || {};
+  const { name, phone, address, currentPassword, newPassword, avatar } = payload || {};
   const user = await User.findById(userId);
   if (!user) {
     const error = new Error("User not found.");
@@ -123,6 +134,14 @@ async function updateProfile(userId, payload) {
 
   if (phone !== undefined) {
     user.phone = String(phone).trim();
+  }
+
+  if (address !== undefined) {
+    user.address = String(address).trim();
+  }
+
+  if (avatar !== undefined) {
+    user.avatar = String(avatar || "").trim();
   }
 
   if (newPassword !== undefined) {
@@ -205,11 +224,69 @@ async function resetPassword({ token, newPassword }) {
   await user.save();
 }
 
+async function deleteAccount(userId) {
+  const targetUser = await User.findById(userId);
+  if (!targetUser) {
+    const error = new Error("User not found.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async () => {
+      const bookingsByUser = await Booking.find({ userId }).select("_id slotId status").session(session).lean();
+      const bookingIdsByUser = bookingsByUser.map((item) => item._id);
+      const activeSlotIds = bookingsByUser
+        .filter((item) => ["pending", "confirmed", "completed"].includes(String(item.status || "")))
+        .map((item) => item.slotId);
+      if (activeSlotIds.length > 0) {
+        await CourtSlot.updateMany({ _id: { $in: activeSlotIds } }, { $set: { isBooked: false } }, { session });
+      }
+
+      const ownedCourts = await Court.find({ ownerId: userId }).select("_id").session(session).lean();
+      const ownedCourtIds = ownedCourts.map((item) => item._id);
+      const courtBookings = ownedCourtIds.length
+        ? await Booking.find({ courtId: { $in: ownedCourtIds } }).select("_id").session(session).lean()
+        : [];
+      const courtBookingIds = courtBookings.map((item) => item._id);
+      const allBookingIdsToDelete = [...new Set([...bookingIdsByUser, ...courtBookingIds].map(String))].map((id) => new mongoose.Types.ObjectId(id));
+
+      if (allBookingIdsToDelete.length > 0) {
+        await Payment.deleteMany({ bookingId: { $in: allBookingIdsToDelete } }).session(session);
+      }
+      await Payment.deleteMany({ userId }).session(session);
+
+      await Favorite.deleteMany({
+        $or: [{ userId }, ...(ownedCourtIds.length ? [{ courtId: { $in: ownedCourtIds } }] : [])],
+      }).session(session);
+
+      await Notification.deleteMany({
+        $or: [{ recipientId: userId }, { actorId: userId }],
+      }).session(session);
+
+      if (allBookingIdsToDelete.length > 0) {
+        await Booking.deleteMany({ _id: { $in: allBookingIdsToDelete } }).session(session);
+      }
+
+      if (ownedCourtIds.length > 0) {
+        await CourtSlot.deleteMany({ courtId: { $in: ownedCourtIds } }).session(session);
+        await Court.deleteMany({ _id: { $in: ownedCourtIds } }).session(session);
+      }
+
+      await User.deleteOne({ _id: userId }).session(session);
+    });
+  } finally {
+    await session.endSession();
+  }
+}
+
 module.exports = {
   register,
   login,
   getProfile,
   updateProfile,
+  deleteAccount,
   requestPasswordReset,
   resetPassword,
 };

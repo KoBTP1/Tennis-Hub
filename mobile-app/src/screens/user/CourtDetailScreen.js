@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity, Image, Linking, Modal, Platform, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { WebView } from "react-native-webview";
 import Card from "../../components/Card";
 import ScreenContainer from "../../components/ScreenContainer";
 import { API_BASE_URL } from "../../config/api";
@@ -59,6 +60,178 @@ function resolveCourtImageUrl(inputUrl) {
   return `${apiOrigin}/${raw}`;
 }
 
+function parseStyledText(input) {
+  let raw = String(input || "").trim();
+  const style = { fontWeight: "500", fontStyle: "normal", fontSize: 16, color: null, textAlign: "left" };
+  const wrappers = [
+    { regex: /^\[size=(\d{1,2})\](.*)\[\/size\]$/is, apply: (match) => ({ key: "fontSize", value: Math.max(12, Math.min(Number(match[1]) || 16, 30)), text: match[2] }) },
+    { regex: /^\[color=(#[0-9a-f]{6})\](.*)\[\/color\]$/is, apply: (match) => ({ key: "color", value: match[1], text: match[2] }) },
+    { regex: /^\[align=(left|center|right)\](.*)\[\/align\]$/is, apply: (match) => ({ key: "textAlign", value: match[1], text: match[2] }) },
+  ];
+  let hasWrapper = true;
+  while (hasWrapper) {
+    hasWrapper = false;
+    for (const wrapper of wrappers) {
+      const matched = wrapper.regex.exec(raw);
+      if (matched) {
+        const result = wrapper.apply(matched);
+        style[result.key] = result.value;
+        raw = String(result.text || "").trim();
+        hasWrapper = true;
+        break;
+      }
+    }
+  }
+  const boldMatch = /^\*\*(.*)\*\*$/s.exec(raw);
+  if (boldMatch) {
+    style.fontWeight = "700";
+    raw = String(boldMatch[1] || "").trim();
+  }
+  const italicMatch = /^\*(.*)\*$/s.exec(raw);
+  if (italicMatch) {
+    style.fontStyle = "italic";
+    raw = String(italicMatch[1] || "").trim();
+  }
+  return {
+    text: raw,
+    style,
+  };
+}
+
+function parseServiceContent(rawContent) {
+  const lines = String(rawContent || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const sections = [];
+  let current = null;
+  for (const line of lines) {
+    if (line.startsWith("#")) {
+      const title = line.replace(/^#+\s*/, "").trim() || "Dich vu";
+      current = { title, rows: [] };
+      sections.push(current);
+      continue;
+    }
+    if (!line.includes("|")) {
+      continue;
+    }
+    const [name, ...rest] = line.split("|");
+    const price = rest.join("|");
+    if (!current) {
+      current = { title: "Dich vu", rows: [] };
+      sections.push(current);
+    }
+    current.rows.push({
+      name: String(name || "").trim(),
+      price: String(price || "").trim(),
+    });
+  }
+  return sections.filter((item) => item.rows.length > 0);
+}
+
+function decodeHtmlText(rawText) {
+  return String(rawText || "")
+    .replaceAll(/<[^>]*>/g, " ")
+    .replaceAll("&nbsp;", " ")
+    .replaceAll("&amp;", "&")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", "\"")
+    .replaceAll("&#39;", "'")
+    .replaceAll(/\s+/g, " ")
+    .trim();
+}
+
+function parseServiceHtmlTables(rawHtml) {
+  const html = String(rawHtml || "");
+  if (!/<table[\s\S]*?>/i.test(html)) {
+    return [];
+  }
+  const tableMatches = html.match(/<table[\s\S]*?<\/table>/gi) || [];
+  return tableMatches
+    .map((tableHtml, tableIndex) => {
+      const rowMatches = tableHtml.match(/<tr[\s\S]*?<\/tr>/gi) || [];
+      const rows = rowMatches
+        .map((rowHtml) => {
+          const cellMatches = rowHtml.match(/<t[hd][\s\S]*?<\/t[hd]>/gi) || [];
+          const cells = cellMatches.map((cellHtml) => decodeHtmlText(cellHtml)).filter(Boolean);
+          return cells;
+        })
+        .filter((cells) => cells.length > 0);
+      if (!rows.length) {
+        return null;
+      }
+      const bodyRows = rows.length > 1 ? rows.slice(1) : rows;
+      return {
+        title: `Dich vu ${tableIndex + 1}`,
+        rows: bodyRows.map((cells) => ({
+          name: String(cells[0] || "").trim(),
+          price: String(cells[1] || cells.slice(1).join(" | ") || "").trim(),
+        })),
+      };
+    })
+    .filter((section) => section && section.rows.some((row) => row.name || row.price));
+}
+
+function buildServicePreviewHtml(rawHtml) {
+  const safeHtml = String(rawHtml || "")
+    .replaceAll(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+    .replaceAll("</script>", "<\\/script>");
+  return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { margin: 0; padding: 10px; font-family: Inter, Arial, sans-serif; color: #111827; background: transparent; }
+      table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+      td, th { border: 1px solid #9ca3af; padding: 8px; vertical-align: top; }
+    </style>
+  </head>
+  <body>${safeHtml}</body>
+</html>`;
+}
+
+function normalizeExternalUrl(rawValue) {
+  const raw = String(rawValue || "").trim();
+  if (!raw) {
+    return "";
+  }
+  if (/^https?:\/\//i.test(raw)) {
+    return raw;
+  }
+  return `https://${raw}`;
+}
+
+const ZALO_ICON_URL = "https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/Icon_of_Zalo.svg/1024px-Icon_of_Zalo.svg.png";
+
+function getFacebookMessageCandidates(rawUrl) {
+  const normalized = normalizeExternalUrl(rawUrl);
+  if (!normalized) {
+    return [];
+  }
+  const candidates = [];
+  try {
+    candidates.push(`fb://facewebmodal/f?href=${encodeURIComponent(normalized)}`);
+  } catch {
+    // Keep fallback link.
+  }
+  candidates.push(normalized);
+  return [...new Set(candidates)];
+}
+
+function getZaloMessageCandidates(rawUrl) {
+  const normalized = normalizeExternalUrl(rawUrl);
+  if (!normalized) {
+    return [];
+  }
+  const candidates = [normalized];
+  if (/^https?:\/\/zalo\.me\//i.test(normalized)) {
+    candidates.unshift(normalized.replace(/^https?:\/\//i, "zalo://"));
+  }
+  return [...new Set(candidates)];
+}
+
 export default function CourtDetailScreen({
   courtId,
   onBack,
@@ -68,10 +241,16 @@ export default function CourtDetailScreen({
   detailActionLabel = "",
   showBookingActions = allowBooking,
   showHeaderBookingAction = showBookingActions,
+  favoriteRevision = 0,
+  onFavoriteChanged,
+  fetchCourtDetail = getCourtDetail,
+  fetchCourtSlots = getCourtSlots,
+  forcedFavoriteState = undefined,
+  onFavoriteStateChange = null,
 }) {
   const { user } = useAuth();
   const { isDarkMode } = useTheme();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [court, setCourt] = useState(null);
   const [slots, setSlots] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -81,6 +260,7 @@ export default function CourtDetailScreen({
   const [isFavorite, setIsFavorite] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState("");
   const [isImagePreviewVisible, setIsImagePreviewVisible] = useState(false);
+  const effectiveFavorite = typeof forcedFavoriteState === "boolean" ? forcedFavoriteState : isFavorite;
   const palette = getPalette(isDarkMode);
   const selectedDate = new Date().toISOString().split("T")[0];
   const primaryImageUrl = resolveCourtImageUrl(Array.isArray(court?.images) ? court.images[0] : "");
@@ -94,6 +274,16 @@ export default function CourtDetailScreen({
       ),
     [slots]
   );
+  const serviceSections = useMemo(() => parseServiceContent(court?.serviceContent || ""), [court?.serviceContent]);
+  const serviceHtmlSections = useMemo(() => parseServiceHtmlTables(court?.serviceContent || ""), [court?.serviceContent]);
+  const contactLabel = language === "en" ? "Contact" : "Liên hệ";
+  const localizedLocation = useMemo(() => {
+    if (language === "en") {
+      return String(court?.locationEn || court?.locationVi || court?.location || "").trim();
+    }
+    return String(court?.locationVi || court?.location || court?.locationEn || "").trim();
+  }, [court?.location, court?.locationEn, court?.locationVi, language]);
+  const hasHtmlServiceContent = /<[^>]+>/.test(String(court?.serviceContent || ""));
   const slotTimeRangeLabel = (() => {
     if (!Array.isArray(slots) || slots.length === 0) {
       return "--:-- - --:--";
@@ -120,11 +310,13 @@ export default function CourtDetailScreen({
       const isValidDateFormat = /^\d{4}-\d{2}-\d{2}$/.test(String(selectedDate || "").trim());
       const queryDate = isValidDateFormat ? selectedDate : "";
       const [courtData, slotsData] = await Promise.all([
-        getCourtDetail(courtId),
-        getCourtSlots(courtId, queryDate),
+        fetchCourtDetail(courtId),
+        fetchCourtSlots(courtId, queryDate),
       ]);
       setCourt(courtData?.data || null);
-      setIsFavorite(Boolean(courtData?.data?.isFavorited));
+      if (typeof forcedFavoriteState !== "boolean") {
+        setIsFavorite(Boolean(courtData?.data?.isFavorited));
+      }
       setSlots(Array.isArray(slotsData?.data) ? slotsData.data : []);
     } catch (err) {
       setError(err.message || t("loadCourtDetailsFailed"));
@@ -136,20 +328,32 @@ export default function CourtDetailScreen({
 
   useEffect(() => {
     fetchData();
-  }, [courtId, selectedDate]);
+  }, [courtId, selectedDate, favoriteRevision, fetchCourtDetail, fetchCourtSlots, forcedFavoriteState]);
+
+  useEffect(() => {
+    if (typeof forcedFavoriteState === "boolean") {
+      setIsFavorite(forcedFavoriteState);
+    }
+  }, [forcedFavoriteState]);
 
   const handleToggleFavorite = async () => {
-    const previous = isFavorite;
-    setIsFavorite(!previous);
+    const previous = effectiveFavorite;
+    const optimisticNext = !previous;
+    setIsFavorite(optimisticNext);
+    onFavoriteStateChange?.(courtId, optimisticNext);
     if ((user?.role || "").toLowerCase() !== "player") {
       return;
     }
     try {
       const response = await toggleCourtFavorite(courtId);
-      setIsFavorite(Boolean(response?.data?.isFavorited));
+      const serverFavorite = Boolean(response?.data?.isFavorited);
+      setIsFavorite(serverFavorite);
+      onFavoriteStateChange?.(courtId, serverFavorite);
+      onFavoriteChanged?.();
     } catch {
       setIsFavorite(previous);
-      Alert.alert("Favorite", "Unable to update favorite at this moment.");
+      onFavoriteStateChange?.(courtId, previous);
+      Alert.alert(t("favorite"), t("favoriteUpdateFailed"));
     }
   };
 
@@ -210,7 +414,7 @@ export default function CourtDetailScreen({
       return directUrl;
     }
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-      String(court?.location || court?.name || "Tennis court").trim()
+      String(localizedLocation || court?.name || "Tennis court").trim()
     )}`;
   };
 
@@ -229,7 +433,7 @@ export default function CourtDetailScreen({
   };
 
   const openNativeMaps = async () => {
-    const fallbackQuery = String(court?.location || court?.name || "Tennis court").trim();
+    const fallbackQuery = String(localizedLocation || court?.name || "Tennis court").trim();
     const coordinates = getCoordinates();
     const nativeUrl = Platform.select({
       ios: coordinates
@@ -262,6 +466,25 @@ export default function CourtDetailScreen({
       { text: t("defaultMaps"), onPress: () => void openNativeMaps() },
       { text: t("googleMaps"), onPress: () => void openGoogleMaps() },
     ]);
+  };
+
+  const handleOpenContactLink = async (type, rawUrl) => {
+    const candidates = type === "facebook" ? getFacebookMessageCandidates(rawUrl) : getZaloMessageCandidates(rawUrl);
+    if (!candidates.length) {
+      return;
+    }
+    for (const candidate of candidates) {
+      try {
+        const canOpen = await Linking.canOpenURL(candidate);
+        if (canOpen) {
+          await Linking.openURL(candidate);
+          return;
+        }
+      } catch {
+        // Try next candidate.
+      }
+    }
+    Alert.alert(t("contact"), t("contactCannotOpenLink"));
   };
 
   if (isLoading) {
@@ -313,7 +536,7 @@ export default function CourtDetailScreen({
               <Ionicons name="location-outline" size={17} color="#065f46" />
             </TouchableOpacity>
             <TouchableOpacity style={styles.roundBtn} onPress={handleToggleFavorite}>
-              <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={17} color="#065f46" />
+              <Ionicons name={effectiveFavorite ? "heart" : "heart-outline"} size={17} color="#065f46" />
             </TouchableOpacity>
             {showHeaderBookingAction ? (
               <TouchableOpacity style={styles.bookHeaderBtn} onPress={allowBooking ? handleHeaderBook : () => setActiveTab("info")}>
@@ -375,19 +598,32 @@ export default function CourtDetailScreen({
             <Text style={[styles.title, { color: palette.textPrimary }]}>{court.name}</Text>
             <View style={styles.infoLine}>
               <Ionicons name="location" size={16} color="#047857" />
-              <Text style={[styles.meta, { color: palette.textSecondary }]}>{court.location}</Text>
+              <Text style={[styles.meta, { color: palette.textSecondary }]}>{localizedLocation}</Text>
             </View>
             <View style={styles.infoLine}>
               <Ionicons name="time" size={16} color="#047857" />
-              <Text style={[styles.meta, { color: palette.textSecondary }]}>{slotTimeRangeLabel}</Text>
+              <Text style={[styles.meta, { color: palette.textSecondary }]}>{court.openingHours || slotTimeRangeLabel}</Text>
             </View>
             <View style={styles.infoLine}>
-              <Ionicons name="navigate" size={16} color="#047857" />
-              <Text style={[styles.metaLink, { color: "#10b981" }]}>{t("viewCourtOnMap")}</Text>
+              <Ionicons name="call" size={16} color="#047857" />
+              <Text style={[styles.meta, { color: palette.textSecondary }]}>{`${contactLabel}: ${court.contactPhone || "--"}`}</Text>
             </View>
-            <TouchableOpacity style={styles.mapInlineBtn} onPress={handleOpenMap}>
-              <Text style={styles.metaLink}>{t("openMapInline")}</Text>
-            </TouchableOpacity>
+            {court.facebookLink ? (
+              <View style={styles.infoLine}>
+                <Ionicons name="logo-facebook" size={16} color="#047857" />
+                <TouchableOpacity onPress={() => void handleOpenContactLink("facebook", court.facebookLink)}>
+                  <Text style={styles.metaLink}>{t("contactFacebookAction")}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+            {court.zaloLink ? (
+              <View style={styles.infoLine}>
+                <Image source={{ uri: ZALO_ICON_URL }} style={styles.zaloIcon} resizeMode="contain" />
+                <TouchableOpacity onPress={() => void handleOpenContactLink("zalo", court.zaloLink)}>
+                  <Text style={styles.metaLink}>{t("contactZaloAction")}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
 
             <Text style={[styles.slotHeading, { color: palette.textPrimary }]}>{t("availableSlots")}</Text>
             {sortedSlots.length ? (
@@ -426,7 +662,54 @@ export default function CourtDetailScreen({
           </Card>
         ) : null}
 
-        {activeTab !== "info" && activeTab !== "images" ? (
+        {activeTab === "service" ? (
+          serviceSections.length ? (
+            serviceSections.map((section, sectionIndex) => {
+              const parsedTitle = parseStyledText(section.title);
+              return (
+                <Card key={`${section.title}-${sectionIndex}`} style={[styles.serviceCard, { backgroundColor: palette.card }]}>
+                  <Text style={[styles.serviceTitle, { color: parsedTitle.style.color || palette.textPrimary, textAlign: parsedTitle.style.textAlign }, parsedTitle.style]}>{parsedTitle.text}</Text>
+                  <View style={styles.serviceTable}>
+                    {section.rows.map((row, index) => {
+                      const parsedName = parseStyledText(row.name);
+                      const parsedPrice = parseStyledText(row.price);
+                      return (
+                        <View key={`${section.title}-${row.name}-${index}`} style={[styles.serviceRow, index === section.rows.length - 1 ? styles.serviceRowLast : null]}>
+                          <Text style={[styles.serviceName, { color: parsedName.style.color || palette.textPrimary, textAlign: parsedName.style.textAlign }, parsedName.style]}>{parsedName.text}</Text>
+                          <Text style={[styles.servicePrice, { color: parsedPrice.style.color || palette.textPrimary, textAlign: parsedPrice.style.textAlign }, parsedPrice.style]}>{parsedPrice.text}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </Card>
+              );
+            })
+          ) : serviceHtmlSections.length ? (
+            serviceHtmlSections.map((section, sectionIndex) => (
+              <Card key={`${section.title}-${sectionIndex}`} style={[styles.serviceCard, { backgroundColor: palette.card }]}>
+                <Text style={[styles.serviceTitle, { color: palette.textPrimary }]}>{section.title}</Text>
+                <View style={styles.serviceTable}>
+                  {section.rows.map((row, index) => (
+                    <View key={`${section.title}-${row.name}-${index}`} style={[styles.serviceRow, index === section.rows.length - 1 ? styles.serviceRowLast : null]}>
+                      <Text style={[styles.serviceName, { color: palette.textPrimary }]}>{row.name || "--"}</Text>
+                      <Text style={[styles.servicePrice, { color: palette.textPrimary }]}>{row.price || "--"}</Text>
+                    </View>
+                  ))}
+                </View>
+              </Card>
+            ))
+          ) : hasHtmlServiceContent ? (
+            <Card style={[styles.serviceCard, { backgroundColor: palette.card }]}>
+              <WebView source={{ html: buildServicePreviewHtml(court?.serviceContent || "") }} style={styles.serviceHtmlWebView} />
+            </Card>
+          ) : (
+            <Card style={{ backgroundColor: palette.card }}>
+              <Text style={[styles.placeholderText, { color: palette.textSecondary }]}>{t("comingSoonContent")}</Text>
+            </Card>
+          )
+        ) : null}
+
+        {activeTab !== "info" && activeTab !== "images" && activeTab !== "service" ? (
           <Card style={{ backgroundColor: palette.card }}>
             <Text style={[styles.placeholderText, { color: palette.textSecondary }]}>
               {t("comingSoonContent")}
@@ -498,6 +781,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: "bold", color: colors.textPrimary, marginBottom: 8 },
   meta: { fontSize: 16, color: colors.textSecondary },
   metaLink: { fontSize: 16, color: "#10b981", fontWeight: "600" },
+  zaloIcon: { width: 16, height: 16, borderRadius: 4 },
   price: { fontSize: 18, color: colors.success, fontWeight: "bold", marginBottom: 4 },
   description: { fontSize: 15, color: colors.textPrimary, marginTop: 8, lineHeight: 22 },
   mapInlineBtn: { marginTop: 4, alignSelf: "flex-start" },
@@ -528,6 +812,28 @@ const styles = StyleSheet.create({
   bookBtnText: { color: colors.white, fontWeight: "bold", fontSize: 16 },
   galleryRow: { gap: 10, paddingRight: 10 },
   galleryImage: { width: 190, height: 260, borderRadius: 12, marginBottom: 8, backgroundColor: "#e5e7eb" },
+  serviceCard: { borderRadius: 12, marginBottom: 10 },
+  serviceTitle: { fontSize: 20, fontWeight: "800", marginBottom: 8 },
+  serviceTable: {
+    borderWidth: 1,
+    borderColor: "#9ca3af",
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  serviceRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    minHeight: 44,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#9ca3af",
+    paddingHorizontal: 10,
+    gap: 8,
+  },
+  serviceRowLast: { borderBottomWidth: 0 },
+  serviceName: { flex: 1, fontSize: 15, fontWeight: "500" },
+  servicePrice: { fontSize: 15, fontWeight: "600" },
+  serviceHtmlWebView: { width: "100%", height: 360, backgroundColor: "transparent" },
   placeholderText: { fontSize: 14, lineHeight: 20 },
   previewBackdrop: { flex: 1, backgroundColor: "rgba(2, 6, 23, 0.9)", alignItems: "center", justifyContent: "center", padding: 12 },
   previewClose: { position: "absolute", top: 40, right: 20, zIndex: 2 },

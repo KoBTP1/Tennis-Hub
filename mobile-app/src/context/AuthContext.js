@@ -1,5 +1,14 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { getCurrentSession, loginUser, logoutUser, registerUser, updateMyProfile, updateSessionUser } from "../services/authService";
+import {
+  getCurrentSession,
+  loginUser,
+  logoutUser,
+  registerUser,
+  deleteMyAccount,
+  updateMyProfile,
+  updateSessionUser,
+  uploadMyAvatar,
+} from "../services/authService";
 
 const AuthContext = createContext(null);
 
@@ -42,6 +51,11 @@ export function AuthProvider({ children }) {
         setUser(null);
         setToken(null);
       },
+      deleteAccount: async () => {
+        await deleteMyAccount();
+        setUser(null);
+        setToken(null);
+      },
       updateProfile: async (changes) => {
         const response = await updateMyProfile(changes);
         const nextUserFromApi = response?.user || null;
@@ -51,7 +65,19 @@ export function AuthProvider({ children }) {
           return session.user;
         }
 
-        const fallbackUser = { ...(user || {}), ...(nextUserFromApi || changes || {}) };
+        const fallbackUser = { ...user, ...(nextUserFromApi || changes) };
+        setUser(fallbackUser);
+        return fallbackUser;
+      },
+      updateAvatar: async (asset) => {
+        const response = await uploadMyAvatar(asset);
+        const nextUserFromApi = response?.user || null;
+        const session = await updateSessionUser(nextUserFromApi);
+        if (session?.user) {
+          setUser(session.user);
+          return session.user;
+        }
+        const fallbackUser = { ...user, ...nextUserFromApi };
         setUser(fallbackUser);
         return fallbackUser;
       },

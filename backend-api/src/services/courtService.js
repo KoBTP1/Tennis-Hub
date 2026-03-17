@@ -1,17 +1,56 @@
 const Court = require("../models/Court");
 const CourtSlot = require("../models/CourtSlot");
 const Favorite = require("../models/Favorite");
+const Booking = require("../models/Booking");
 const notificationService = require("./notificationService");
 const { escapeRegex } = require("../utils/requestValidation");
+
+function toMinutes(timeString) {
+  const [hour, minute] = String(timeString || "").split(":").map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
+    return null;
+  }
+  return hour * 60 + minute;
+}
+
+function getSlotEndDate(slot) {
+  const dateText = String(slot?.date || "").trim();
+  const [year, month, day] = dateText.split("-").map(Number);
+  const endMinutes = toMinutes(slot?.endTime);
+  if (!year || !month || !day || endMinutes === null) {
+    return null;
+  }
+  const endHour = Math.floor(endMinutes / 60);
+  const endMinute = endMinutes % 60;
+  return new Date(year, month - 1, day, endHour, endMinute, 0, 0);
+}
+
+async function purgeExpiredCourtSlots(courtId) {
+  const now = new Date();
+  const allSlots = await CourtSlot.find({ courtId }).select("_id date endTime");
+  const expiredSlotIds = allSlots
+    .filter((slot) => {
+      const endAt = getSlotEndDate(slot);
+      return endAt ? endAt <= now : false;
+    })
+    .map((slot) => slot._id);
+  if (expiredSlotIds.length > 0) {
+    await CourtSlot.deleteMany({ _id: { $in: expiredSlotIds } });
+  }
+}
 
 async function searchCourts({ keyword, location, page = 1, limit = 20, userId = "" }) {
   const query = { status: "approved", isDeleted: { $ne: true } };
   if (keyword) {
     const regex = new RegExp(escapeRegex(keyword), "i");
-    query.$or = [{ name: regex }, { location: regex }];
+    query.$or = [{ name: regex }, { location: regex }, { locationVi: regex }, { locationEn: regex }];
   }
   if (location) {
-    query.location = new RegExp(escapeRegex(location), "i");
+    const regex = new RegExp(escapeRegex(location), "i");
+    query.$and = [
+      ...(Array.isArray(query.$and) ? query.$and : []),
+      { $or: [{ location: regex }, { locationVi: regex }, { locationEn: regex }] },
+    ];
   }
 
   const skip = (page - 1) * limit;
@@ -77,6 +116,8 @@ async function getAvailableSlots(courtId, date) {
     throw error;
   }
 
+  await purgeExpiredCourtSlots(courtId);
+
   const query = { courtId, isBooked: false };
   if (date) {
     query.date = date; // Expecting YYYY-MM-DD
@@ -84,10 +125,17 @@ async function getAvailableSlots(courtId, date) {
 
   // Sort by date and startTime
   const slots = await CourtSlot.find(query).sort({ date: 1, startTime: 1 }).lean();
+  const activeBookings = await Booking.find({
+    slotId: { $in: slots.map((slot) => slot._id) },
+    status: { $in: ["pending", "confirmed", "completed"] },
+  })
+    .select("slotId")
+    .lean();
+  const bookedSlotIdSet = new Set(activeBookings.map((item) => String(item.slotId)));
   return slots.map(slot => ({
     ...slot,
-    status: slot.isBooked ? "booked" : "available"
-  }));
+    status: slot.isBooked ? "booked" : "available",
+  })).filter((slot) => !bookedSlotIdSet.has(String(slot._id)));
 }
 
 async function toggleFavorite({ userId, courtId }) {

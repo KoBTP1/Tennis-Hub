@@ -1,5 +1,7 @@
 import React, { useState } from "react";
-import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import { Ionicons } from "@expo/vector-icons";
 import Card from "../../components/Card";
 import GradientButton from "../../components/GradientButton";
 import RoleTopBar from "../../components/RoleTopBar";
@@ -7,6 +9,7 @@ import ScreenContainer from "../../components/ScreenContainer";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { colors } from "../../styles/theme";
+import { normalizeImageUrl } from "../../utils/imageUrl";
 import { getVietnamesePhoneErrorMessage, isValidVietnamesePhone, normalizePhoneNumber } from "../../utils/validation";
 
 function getPalette(isDarkMode) {
@@ -32,15 +35,56 @@ function getPalette(isDarkMode) {
 }
 
 export default function EditProfileScreen({ onBack }) {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, updateAvatar } = useAuth();
   const { isDarkMode } = useTheme();
   const palette = getPalette(isDarkMode);
   const [name, setName] = useState(user?.name || "");
   const [phone, setPhone] = useState(user?.phone || "");
+  const [address, setAddress] = useState(user?.address || "");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarUri = normalizeImageUrl(user?.avatar || user?.avatarUrl || "");
+  const accountRole = String(user?.role || "user").toUpperCase();
+
+  const handlePickAvatar = async () => {
+    try {
+      if (Platform.OS !== "web") {
+        const currentPermission = await ImagePicker.getMediaLibraryPermissionsAsync();
+        let permissionResult = currentPermission;
+        if (!currentPermission.granted) {
+          permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        }
+        if (!permissionResult.granted) {
+          Alert.alert("Permission required", "Please allow photo access to update your avatar.");
+          return;
+        }
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (result.canceled) {
+        return;
+      }
+      const selectedAsset = Array.isArray(result.assets) ? result.assets[0] : null;
+      if (!selectedAsset) {
+        return;
+      }
+      setIsUploadingAvatar(true);
+      await updateAvatar(selectedAsset);
+      Alert.alert("Success", "Avatar updated successfully.");
+    } catch (error) {
+      Alert.alert("Error", error?.message || "Failed to update avatar.");
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -75,6 +119,7 @@ export default function EditProfileScreen({ onBack }) {
       const payload = {
         name: name.trim(),
         phone: normalizedPhone,
+        address: address.trim(),
       };
 
       if (isPasswordChangeRequested) {
@@ -97,6 +142,29 @@ export default function EditProfileScreen({ onBack }) {
       <KeyboardAvoidingView style={styles.keyboardAvoiding} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScreenContainer backgroundColor={palette.background}>
           <Card style={[styles.card, { backgroundColor: palette.card }]}>
+          <View style={styles.avatarSection}>
+            <View style={[styles.avatarWrap, { borderColor: palette.border, backgroundColor: palette.inputBg }]}>
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={styles.avatarImage} resizeMode="cover" />
+              ) : (
+                <View style={styles.avatarFallback}>
+                  <Text style={styles.avatarFallbackText}>{(name || user?.name || "U").slice(0, 1).toUpperCase()}</Text>
+                </View>
+              )}
+            </View>
+            <TouchableOpacity
+              style={[styles.avatarButton, { borderColor: palette.border, backgroundColor: palette.inputBg }]}
+              onPress={() => {
+                void handlePickAvatar();
+              }}
+              disabled={isUploadingAvatar}
+            >
+              <Ionicons name="camera-outline" size={16} color={colors.info} />
+              <Text style={[styles.avatarButtonText, { color: palette.textPrimary }]}>
+                {isUploadingAvatar ? "Uploading..." : "Change Avatar"}
+              </Text>
+            </TouchableOpacity>
+          </View>
           <Text style={[styles.label, { color: palette.textSecondary }]}>Full Name</Text>
           <TextInput
             value={name}
@@ -129,6 +197,22 @@ export default function EditProfileScreen({ onBack }) {
             ]}
           />
 
+          <Text style={[styles.label, { color: palette.textSecondary }]}>Role</Text>
+          <TextInput
+            value={accountRole}
+            editable={false}
+            placeholderTextColor={palette.textSecondary}
+            style={[
+              styles.input,
+              styles.disabledInput,
+              {
+                color: palette.textSecondary,
+                borderColor: palette.border,
+                backgroundColor: palette.inputBg,
+              },
+            ]}
+          />
+
           <Text style={[styles.label, { color: palette.textSecondary }]}>Phone</Text>
           <TextInput
             value={phone}
@@ -136,6 +220,22 @@ export default function EditProfileScreen({ onBack }) {
             placeholder="Phone number"
             placeholderTextColor={palette.textSecondary}
             keyboardType="phone-pad"
+            style={[
+              styles.input,
+              {
+                color: palette.textPrimary,
+                borderColor: palette.border,
+                backgroundColor: palette.inputBg,
+              },
+            ]}
+          />
+
+          <Text style={[styles.label, { color: palette.textSecondary }]}>Address</Text>
+          <TextInput
+            value={address}
+            onChangeText={setAddress}
+            placeholder="Your address"
+            placeholderTextColor={palette.textSecondary}
             style={[
               styles.input,
               {
@@ -216,6 +316,36 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   keyboardAvoiding: { flex: 1 },
   card: { paddingVertical: 12 },
+  avatarSection: { alignItems: "center", marginBottom: 10 },
+  avatarWrap: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    borderWidth: 1,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarImage: { width: "100%", height: "100%" },
+  avatarFallback: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#e2e8f0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarFallbackText: { fontSize: 30, fontWeight: "800", color: "#065f46" },
+  avatarButton: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  avatarButtonText: { fontWeight: "700", fontSize: 13 },
   sectionTitle: { fontSize: 16, fontWeight: "700", marginTop: 4, marginBottom: 8 },
   label: { fontSize: 14, marginTop: 2, marginBottom: 8, fontWeight: "600" },
   input: {

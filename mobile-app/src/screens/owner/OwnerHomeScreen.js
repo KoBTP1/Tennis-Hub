@@ -26,9 +26,9 @@ function normalizeImageUrl(url) {
   return `${apiOrigin}/${raw}`;
 }
 
-export default function OwnerHomeScreen({ onOpenCourt }) {
+export default function OwnerHomeScreen({ onOpenCourt, onNavigate, favoriteOverrides = {}, onFavoriteStateChange }) {
   const { theme } = useTheme();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [isLoading, setIsLoading] = useState(true);
   const [courtCards, setCourtCards] = useState([]);
 
@@ -41,7 +41,10 @@ export default function OwnerHomeScreen({ onOpenCourt }) {
         key: String(court.id || court._id || court.name),
         courtId: court.id || court._id,
         name: court.name,
-        location: court.location,
+        location:
+          language === "en"
+            ? court.locationEn || court.locationVi || court.location
+            : court.locationVi || court.location || court.locationEn,
         mapUrl: court.mapUrl,
         pricePerHour: court.pricePerHour || 0,
         images: Array.isArray(court.images) ? court.images : [],
@@ -60,19 +63,23 @@ export default function OwnerHomeScreen({ onOpenCourt }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <RoleTopBar />
+      <RoleTopBar onAvatarPress={() => onNavigate?.("edit-profile")} />
       <ScreenContainer>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>{t("courts")}</Text>
         {isLoading ? <ActivityIndicator size="large" color={theme.info} /> : null}
         {!isLoading && courtCards.length === 0 ? (
           <Card>
-            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>Chưa có sân nào.</Text>
+            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>{t("noCourtsYet")}</Text>
           </Card>
         ) : null}
 
         {!isLoading &&
-          courtCards.map((item) => (
-            <CourtCard
+          courtCards.map((item) => {
+            const favoriteKey = String(item.courtId || "");
+            const hasOverride = Object.hasOwn(favoriteOverrides, favoriteKey);
+            const isFavorite = hasOverride ? Boolean(favoriteOverrides[favoriteKey]) : false;
+            return (
+              <CourtCard
               key={item.key}
               name={item.name}
               location={item.location}
@@ -80,10 +87,13 @@ export default function OwnerHomeScreen({ onOpenCourt }) {
               price={formatVNDPerHour(item.pricePerHour)}
               imageUrl={normalizeImageUrl(Array.isArray(item.images) ? item.images[0] : "")}
               imageUrls={Array.isArray(item.images) ? item.images.map((imageUrl) => normalizeImageUrl(imageUrl)) : []}
+              isFavorite={isFavorite}
+              onToggleFavorite={() => onFavoriteStateChange?.(favoriteKey, !isFavorite)}
               showPrimaryAction={false}
               onPress={() => onOpenCourt?.(item.courtId)}
-            />
-          ))}
+              />
+            );
+          })}
       </ScreenContainer>
     </View>
   );

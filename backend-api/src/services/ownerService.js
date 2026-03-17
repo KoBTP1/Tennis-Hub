@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Booking = require("../models/Booking");
 const Court = require("../models/Court");
 const CourtSlot = require("../models/CourtSlot");
+const User = require("../models/User");
 const notificationService = require("./notificationService");
 const { getNextSequence } = require("../utils/sequence");
 const { escapeRegex } = require("../utils/requestValidation");
@@ -41,15 +42,71 @@ function ensureValidSlotTime(startTime, endTime) {
   }
 }
 
+function getSlotEndDate(slot) {
+  const dateText = String(slot?.date || "").trim();
+  const [year, month, day] = dateText.split("-").map(Number);
+  const endMinutes = toMinutes(slot?.endTime);
+  if (!year || !month || !day || endMinutes === null) {
+    return null;
+  }
+  const endHour = Math.floor(endMinutes / 60);
+  const endMinute = endMinutes % 60;
+  return new Date(year, month - 1, day, endHour, endMinute, 0, 0);
+}
+
+async function purgeExpiredOwnerCourtSlots(courtId) {
+  const now = new Date();
+  const slots = await CourtSlot.find({ courtId }).select("_id date endTime");
+  const expiredSlotIds = slots
+    .filter((slot) => {
+      const endAt = getSlotEndDate(slot);
+      return endAt ? endAt <= now : false;
+    })
+    .map((slot) => slot._id);
+  if (expiredSlotIds.length > 0) {
+    await CourtSlot.deleteMany({ _id: { $in: expiredSlotIds } });
+    const [court, adminUsers] = await Promise.all([
+      Court.findById(courtId).select("_id name ownerId").lean(),
+      User.find({ role: "admin", isBlocked: { $ne: true } }).select("_id").lean(),
+    ]);
+    if (court && adminUsers.length > 0) {
+      await Promise.all(
+        adminUsers.map((admin) =>
+          notificationService.createNotification({
+            recipientId: admin._id,
+            actorId: court.ownerId,
+            type: "court_slots_expired",
+            title: "Court slots expired",
+            message: `Court "${court.name}" has ${expiredSlotIds.length} expired slot(s).`,
+            metadata: {
+              courtId: String(court._id),
+              expiredSlots: expiredSlotIds.length,
+            },
+          })
+        )
+      );
+    }
+  }
+}
+
 function sanitizeCourt(court) {
+  const normalizedLocationVi = String(court.locationVi || court.location || "").trim();
+  const normalizedLocationEn = String(court.locationEn || normalizedLocationVi).trim();
   return {
     numericId: court.id,
     id: court._id.toString(),
     name: court.name,
     location: court.location,
+    locationVi: normalizedLocationVi,
+    locationEn: normalizedLocationEn,
     pricePerHour: court.pricePerHour || 0,
     description: court.description || "",
+    serviceContent: court.serviceContent || "",
     mapUrl: court.mapUrl || "",
+    contactPhone: court.contactPhone || "",
+    zaloLink: court.zaloLink || "",
+    facebookLink: court.facebookLink || "",
+    openingHours: court.openingHours || "",
     images: court.images || [],
     status: court.status,
     createdAt: court.createdAt,
@@ -150,7 +207,7 @@ async function listOwnerCourts({ ownerId, keyword = "", status = "", page = 1, l
 
   if (keyword) {
     const regex = new RegExp(escapeRegex(keyword.trim()), "i");
-    query.$or = [{ name: regex }, { location: regex }];
+    query.$or = [{ name: regex }, { location: regex }, { locationVi: regex }, { locationEn: regex }];
   }
 
   if (status && status !== "all") {
@@ -171,12 +228,34 @@ async function listOwnerCourts({ ownerId, keyword = "", status = "", page = 1, l
   };
 }
 
+async function getOwnerCourtDetail({ ownerId, courtId }) {
+  const court = await getOwnedCourtOrThrow({ ownerId, courtId });
+  return sanitizeCourt(court);
+}
+
 async function createOwnerCourt({ ownerId, payload }) {
-  const { name, location, pricePerHour, description = "", images = [], mapUrl = "" } = payload || {};
+  const {
+    name,
+    location,
+    locationVi = "",
+    locationEn = "",
+    pricePerHour,
+    description = "",
+    serviceContent = "",
+    images = [],
+    mapUrl = "",
+    contactPhone = "",
+    zaloLink = "",
+    facebookLink = "",
+    openingHours = "",
+  } = payload || {};
   const normalizedName = String(name || "").trim();
-  const normalizedLocation = String(location || "").trim();
-  if (!normalizedName || !normalizedLocation || pricePerHour === undefined) {
-    const error = new Error("name, location and pricePerHour are required.");
+  const normalizedLocationVi = String(locationVi || location || "").trim();
+  const normalizedLocationEn = String(locationEn || normalizedLocationVi).trim();
+  const normalizedContactPhone = String(contactPhone || "").trim();
+  const normalizedOpeningHours = String(openingHours || "").trim();
+  if (!normalizedName || !normalizedLocationVi || pricePerHour === undefined || !normalizedContactPhone || !normalizedOpeningHours) {
+    const error = new Error("name, location/locationVi, pricePerHour, contactPhone and openingHours are required.");
     error.statusCode = 400;
     throw error;
   }
@@ -201,15 +280,40 @@ async function createOwnerCourt({ ownerId, payload }) {
       const court = await Court.create({
         id: nextId,
         name: normalizedName,
-        location: normalizedLocation,
+        location: normalizedLocationVi,
+        locationVi: normalizedLocationVi,
+        locationEn: normalizedLocationEn,
         pricePerHour: parsedPrice,
         description: String(description || "").trim(),
+        serviceContent: String(serviceContent || "").trim(),
         mapUrl: normalizedMapUrl,
+        contactPhone: normalizedContactPhone,
+        zaloLink: String(zaloLink || "").trim(),
+        facebookLink: String(facebookLink || "").trim(),
+        openingHours: normalizedOpeningHours,
         images: normalizedImages,
         ownerId,
         status: "pending",
         isDeleted: false,
       });
+      const adminUsers = await User.find({ role: "admin", isBlocked: { $ne: true } }).select("_id").lean();
+      if (adminUsers.length > 0) {
+        await Promise.all(
+          adminUsers.map((admin) =>
+            notificationService.createNotification({
+              recipientId: admin._id,
+              actorId: ownerId,
+              type: "court_submitted",
+              title: "New court submitted",
+              message: `Owner submitted a new court "${court.name}" for approval.`,
+              metadata: {
+                courtId: String(court._id),
+                ownerId: String(ownerId),
+              },
+            })
+          )
+        );
+      }
       return sanitizeCourt(court);
     } catch (error) {
       if (error?.code === 11000 && /id_1/.test(String(error?.message || ""))) {
@@ -226,7 +330,7 @@ async function createOwnerCourt({ ownerId, payload }) {
 
 async function updateOwnerCourt({ ownerId, courtId, payload }) {
   const court = await getOwnedCourtOrThrow({ ownerId, courtId });
-  const { name, location, pricePerHour, description, images, mapUrl } = payload || {};
+  const { name, location, locationVi, locationEn, pricePerHour, description, serviceContent, images, mapUrl, contactPhone, zaloLink, facebookLink, openingHours } = payload || {};
 
   if (name !== undefined) {
     const normalizedName = String(name).trim();
@@ -237,14 +341,22 @@ async function updateOwnerCourt({ ownerId, courtId, payload }) {
     }
     court.name = normalizedName;
   }
-  if (location !== undefined) {
-    const normalizedLocation = String(location).trim();
-    if (!normalizedLocation) {
-      const error = new Error("location cannot be empty.");
+  if (location !== undefined || locationVi !== undefined) {
+    const normalizedLocationVi = String(locationVi !== undefined ? locationVi : location).trim();
+    if (!normalizedLocationVi) {
+      const error = new Error("location/locationVi cannot be empty.");
       error.statusCode = 400;
       throw error;
     }
-    court.location = normalizedLocation;
+    court.location = normalizedLocationVi;
+    court.locationVi = normalizedLocationVi;
+    if (!String(court.locationEn || "").trim()) {
+      court.locationEn = normalizedLocationVi;
+    }
+  }
+  if (locationEn !== undefined) {
+    const normalizedLocationEn = String(locationEn).trim();
+    court.locationEn = normalizedLocationEn || String(court.locationVi || court.location || "").trim();
   }
   if (pricePerHour !== undefined) {
     const parsedPrice = Number(pricePerHour);
@@ -258,11 +370,38 @@ async function updateOwnerCourt({ ownerId, courtId, payload }) {
   if (description !== undefined) {
     court.description = String(description).trim();
   }
+  if (serviceContent !== undefined) {
+    court.serviceContent = String(serviceContent).trim();
+  }
   if (images !== undefined) {
     court.images = normalizeImages(images);
   }
   if (mapUrl !== undefined) {
     court.mapUrl = normalizeMapUrl(mapUrl);
+  }
+  if (contactPhone !== undefined) {
+    const normalizedContactPhone = String(contactPhone).trim();
+    if (!normalizedContactPhone) {
+      const error = new Error("contactPhone cannot be empty.");
+      error.statusCode = 400;
+      throw error;
+    }
+    court.contactPhone = normalizedContactPhone;
+  }
+  if (zaloLink !== undefined) {
+    court.zaloLink = String(zaloLink).trim();
+  }
+  if (facebookLink !== undefined) {
+    court.facebookLink = String(facebookLink).trim();
+  }
+  if (openingHours !== undefined) {
+    const normalizedOpeningHours = String(openingHours).trim();
+    if (!normalizedOpeningHours) {
+      const error = new Error("openingHours cannot be empty.");
+      error.statusCode = 400;
+      throw error;
+    }
+    court.openingHours = normalizedOpeningHours;
   }
 
   await court.save();
@@ -280,6 +419,7 @@ async function deleteOwnerCourt({ ownerId, courtId }) {
 
 async function listOwnerSlots({ ownerId, courtId, date = "" }) {
   await getOwnedCourtOrThrow({ ownerId, courtId });
+  await purgeExpiredOwnerCourtSlots(courtId);
   const query = { courtId };
   if (date) {
     query.date = String(date).trim();
@@ -325,6 +465,7 @@ async function createOwnerSlot({ ownerId, courtId, payload }) {
     const court = await getOwnedCourtOrThrow({ ownerId, courtId });
     court.slotRevision = Number(court.slotRevision || 0) + 1;
     await court.save();
+    await purgeExpiredOwnerCourtSlots(courtId);
     await ensureNoSlotOverlap({
       courtId,
       date: normalizedDate,
@@ -424,6 +565,7 @@ async function updateOwnerSlot({ ownerId, slotId, payload }) {
     const ownedCourt = await getOwnedCourtOrThrow({ ownerId, courtId: slot.courtId });
     ownedCourt.slotRevision = Number(ownedCourt.slotRevision || 0) + 1;
     await ownedCourt.save();
+    await purgeExpiredOwnerCourtSlots(slot.courtId);
 
     await ensureNoSlotOverlap({
       courtId: slot.courtId,
@@ -662,6 +804,7 @@ async function getOwnerDashboard({ ownerId }) {
 
 module.exports = {
   listOwnerCourts,
+  getOwnerCourtDetail,
   createOwnerCourt,
   updateOwnerCourt,
   deleteOwnerCourt,

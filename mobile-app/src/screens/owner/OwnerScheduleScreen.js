@@ -22,7 +22,7 @@ function toMinutes(value) {
   return hour * 60 + minute;
 }
 
-export default function OwnerScheduleScreen({ embedded = false }) {
+export default function OwnerScheduleScreen({ onNavigate, embedded = false }) {
   const { theme } = useTheme();
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const timeOptions = useMemo(() => {
@@ -233,7 +233,7 @@ export default function OwnerScheduleScreen({ embedded = false }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      {embedded ? null : <RoleTopBar />}
+      {embedded ? null : <RoleTopBar onAvatarPress={() => onNavigate?.("edit-profile")} />}
       <KeyboardAvoidingView style={styles.keyboardAvoiding} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScreenContainer>
           <Text style={[styles.label, { color: theme.textSecondary }]}>Select Court</Text>

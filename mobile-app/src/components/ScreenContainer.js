@@ -6,7 +6,9 @@ export default function ScreenContainer({ children, contentStyle, backgroundColo
   const { theme } = useTheme();
   return (
     <View style={[styles.root, { backgroundColor: backgroundColor || theme.background }]}>
-      <ScrollView contentContainerStyle={[styles.content, contentStyle]}>{children}</ScrollView>
+      <ScrollView keyboardShouldPersistTaps="always" contentContainerStyle={[styles.content, contentStyle]}>
+        {children}
+      </ScrollView>
     </View>
   );
 }
