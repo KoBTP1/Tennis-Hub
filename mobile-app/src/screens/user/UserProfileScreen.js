@@ -44,19 +44,10 @@ export default function UserProfileScreen({ onTabPress, onNavigate }) {
   const quickActions = [
     { key: "bookings", label: t("profileQuickBookings"), icon: "calendar-outline" },
     { key: "notifications", label: t("profileQuickNotifications"), icon: "notifications-outline" },
-    { key: "courses", label: t("profileQuickCourses"), icon: "school-outline" },
-    { key: "offers", label: t("profileQuickOffers"), icon: "gift-outline" },
-  ];
-  const activityRows = [
-    { key: "my-team", label: t("profileActivityTeam"), icon: "people-outline" },
-    { key: "my-lessons", label: t("profileActivityLessons"), icon: "reader-outline" },
-    { key: "membership-packages", label: t("profileActivityMembership"), icon: "pricetag-outline" },
   ];
   const systemRows = [
     { key: "settings", label: t("profileSystemSettings"), icon: "settings-outline" },
-    { key: "version", label: t("profileSystemVersion"), icon: "information-circle-outline" },
     { key: "policy", label: t("profileSystemPolicy"), icon: "shield-checkmark-outline" },
-    { key: "news", label: t("profileSystemNews"), icon: "sparkles-outline" },
   ];
 
   const handleQuickAction = (key) => {
@@ -211,23 +202,7 @@ export default function UserProfileScreen({ onTabPress, onNavigate }) {
                   ))}
                 </View>
               </Card>
-              <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>{t("profileSectionActivity")}</Text>
-              <View style={[styles.listCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
-                {activityRows.map((item, index) => (
-                  <TouchableOpacity
-                    key={item.key}
-                    style={[styles.listRow, index === activityRows.length - 1 ? styles.listRowLast : null]}
-                    onPress={() => Alert.alert(t("notifications"), t("featureUpdating"))}
-                  >
-                    <View style={styles.rowLeft}>
-                      <Ionicons name={item.icon} size={20} color="#15803d" />
-                      <Text style={[styles.rowLabel, { color: palette.textPrimary }]}>{item.label}</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={18} color={palette.textSecondary} />
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <Text style={[styles.sectionTitle, styles.sectionSpacing, { color: palette.textPrimary }]}>{t("profileSectionSystem")}</Text>
+              <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>{t("profileSectionSystem")}</Text>
               <View style={[styles.listCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
                 {systemRows.map((item, index) => (
                   <TouchableOpacity
@@ -243,10 +218,9 @@ export default function UserProfileScreen({ onTabPress, onNavigate }) {
                   </TouchableOpacity>
                 ))}
               </View>
-              <Text style={[styles.versionText, { color: palette.textSecondary }]}>{`${t("profileVersionPrefix")}: 2.8.9`}</Text>
             </View>
             <View style={styles.webRightColumn}>
-              <Text style={[styles.webHeading, { color: palette.textPrimary }]}>Danh sach dat lich</Text>
+              <Text style={[styles.webHeading, { color: palette.textPrimary }]}>Danh sách đặt lịch</Text>
               <Card style={[styles.webBookingsCard, { backgroundColor: palette.card, borderColor: palette.border }]}>{webBookingsContent}</Card>
             </View>
           </View>
@@ -294,24 +268,7 @@ export default function UserProfileScreen({ onTabPress, onNavigate }) {
           </View>
         </Card>
 
-        <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>{t("profileSectionActivity")}</Text>
-        <View style={[styles.listCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
-          {activityRows.map((item, index) => (
-            <TouchableOpacity
-              key={item.key}
-              style={[styles.listRow, index === activityRows.length - 1 ? styles.listRowLast : null]}
-              onPress={() => Alert.alert(t("notifications"), t("featureUpdating"))}
-            >
-              <View style={styles.rowLeft}>
-                <Ionicons name={item.icon} size={20} color="#15803d" />
-                <Text style={[styles.rowLabel, { color: palette.textPrimary }]}>{item.label}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={palette.textSecondary} />
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <Text style={[styles.sectionTitle, styles.sectionSpacing, { color: palette.textPrimary }]}>{t("profileSectionSystem")}</Text>
+        <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>{t("profileSectionSystem")}</Text>
         <View style={[styles.listCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
           {systemRows.map((item, index) => (
             <TouchableOpacity
@@ -327,8 +284,6 @@ export default function UserProfileScreen({ onTabPress, onNavigate }) {
             </TouchableOpacity>
           ))}
         </View>
-
-        <Text style={[styles.versionText, { color: palette.textSecondary }]}>{`${t("profileVersionPrefix")}: 2.8.9`}</Text>
           </>
         )}
       </ScreenContainer>
@@ -426,7 +381,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "800",
   },
-  sectionSpacing: { marginTop: 18 },
   listCard: {
     borderRadius: 12,
     borderWidth: 1,
@@ -444,7 +398,6 @@ const styles = StyleSheet.create({
   listRowLast: { borderBottomWidth: 0 },
   rowLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
   rowLabel: { color: "#374151", fontSize: 16, fontWeight: "600" },
-  versionText: { textAlign: "right", marginTop: 10, marginRight: 4, fontWeight: "600" },
   webSplit: { flexDirection: "row", gap: 12, minHeight: 560 },
   webLeftColumn: { width: 320 },
   webRightColumn: { flex: 1 },

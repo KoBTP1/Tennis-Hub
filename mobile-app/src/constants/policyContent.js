@@ -1,47 +1,47 @@
 export const POLICY_CONTENT = {
   vi: {
-    title: "Dieu khoan va Chinh sach",
-    updatedAt: "Cap nhat: 17/03/2026",
+    title: "Điều khoản và Chính sách",
+    updatedAt: "Cập nhật: 17/03/2026",
     sections: [
       {
-        heading: "1. Pham vi ap dung",
+        heading: "1. Phạm vi áp dụng",
         body:
-          "Dieu khoan nay ap dung cho tat ca tai khoan PLAYER su dung ung dung thue san tennis Tennis Hub. Khi su dung ung dung, nguoi dung dong y tuan thu cac quy dinh duoi day.",
+          "Điều khoản này áp dụng cho tất cả tài khoản PLAYER sử dụng ứng dụng thuê sân tennis Tennis Hub. Khi sử dụng ứng dụng, người dùng đồng ý tuân thủ các quy định dưới đây.",
       },
       {
-        heading: "2. Dat san va thanh toan",
+        heading: "2. Đặt sân và thanh toán",
         body:
-          "Nguoi dung can cung cap thong tin chinh xac khi dat san. Gia tien, khung gio va trang thai dat san duoc hien thi theo du lieu tu chu san. Moi giao dich thanh toan phai duoc thuc hien dung quy trinh trong ung dung.",
+          "Người dùng cần cung cấp thông tin chính xác khi đặt sân. Giá tiền, khung giờ và trạng thái đặt sân được hiển thị theo dữ liệu từ chủ sân. Mọi giao dịch thanh toán phải được thực hiện đúng quy trình trong ứng dụng.",
       },
       {
-        heading: "3. Huy lich dat",
+        heading: "3. Hủy lịch đặt",
         body:
-          "Nguoi dung co the huy lich dat theo chinh sach cua chu san. Trong truong hop qua thoi han huy hoac vi pham dieu kien huy, phi dat san co the khong duoc hoan lai.",
+          "Người dùng có thể hủy lịch đặt theo chính sách của chủ sân. Trong trường hợp quá thời hạn hủy hoặc vi phạm điều kiện hủy, phí đặt sân có thể không được hoàn lại.",
       },
       {
-        heading: "4. Quy tac su dung san",
+        heading: "4. Quy tắc sử dụng sân",
         body:
-          "Nguoi dung phai co mat dung gio, giu gin tai san san bong, khong gay mat trat tu va tuan thu huong dan cua co so. Hanh vi vi pham co the dan den viec khoa tinh nang dat san.",
+          "Người dùng phải có mặt đúng giờ, giữ gìn tài sản sân bóng, không gây mất trật tự và tuân thủ hướng dẫn của cơ sở. Hành vi vi phạm có thể dẫn đến việc khóa tính năng đặt sân.",
       },
       {
-        heading: "5. Tai khoan va bao mat",
+        heading: "5. Tài khoản và bảo mật",
         body:
-          "Nguoi dung tu chiu trach nhiem bao mat thong tin dang nhap. Tennis Hub co quyen tam khoa tai khoan neu phat hien dau hieu gian lan, gia mao hoac su dung trai phep.",
+          "Người dùng tự chịu trách nhiệm bảo mật thông tin đăng nhập. Tennis Hub có quyền tạm khóa tài khoản nếu phát hiện dấu hiệu gian lận, giả mạo hoặc sử dụng trái phép.",
       },
       {
-        heading: "6. Du lieu ca nhan",
+        heading: "6. Dữ liệu cá nhân",
         body:
-          "Tennis Hub thu thap cac thong tin can thiet de van hanh dat san va cham soc khach hang, bao gom ho ten, email, so dien thoai va lich su dat san. Du lieu duoc bao mat theo quy dinh hien hanh.",
+          "Tennis Hub thu thập các thông tin cần thiết để vận hành đặt sân và chăm sóc khách hàng, bao gồm họ tên, email, số điện thoại và lịch sử đặt sân. Dữ liệu được bảo mật theo quy định hiện hành.",
       },
       {
-        heading: "7. Gioi han trach nhiem",
+        heading: "7. Giới hạn trách nhiệm",
         body:
-          "Tennis Hub dong vai tro nen tang ket noi nguoi choi va chu san. Cac van de phat sinh tai san (co so vat chat, tranh chap truc tiep, su co ngoai y muon) se duoc xu ly uu tien theo chinh sach cua chu san.",
+          "Tennis Hub đóng vai trò nền tảng kết nối người chơi và chủ sân. Các vấn đề phát sinh tại sân (cơ sở vật chất, tranh chấp trực tiếp, sự cố ngoài ý muốn) sẽ được xử lý ưu tiên theo chính sách của chủ sân.",
       },
       {
-        heading: "8. Dieu chinh dieu khoan",
+        heading: "8. Điều chỉnh điều khoản",
         body:
-          "Tennis Hub co the cap nhat dieu khoan theo tung thoi diem de phu hop van hanh. Phien ban dieu khoan moi nhat se duoc cap nhat truc tiep trong ung dung.",
+          "Tennis Hub có thể cập nhật điều khoản theo từng thời điểm để phù hợp vận hành. Phiên bản điều khoản mới nhất sẽ được cập nhật trực tiếp trong ứng dụng.",
       },
     ],
   },

@@ -45,7 +45,7 @@ const bookingSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ["mock", ""],
+      enum: ["mock", "vnpay", ""],
       default: "",
     },
     paymentOrderId: {
