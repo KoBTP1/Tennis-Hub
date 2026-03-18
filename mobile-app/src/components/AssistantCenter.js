@@ -1,33 +1,47 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useLanguage } from "../context/LanguageContext";
 import { useTheme } from "../context/ThemeContext";
 import { askAssistant } from "../services/assistantService";
 import { radius } from "../styles/theme";
 
-function buildWelcomeMessage() {
+function buildWelcomeMessage(t) {
   return {
     id: "welcome",
     role: "assistant",
-    text: "Xin chao, minh la TennisHub Assistant. Ban can ho tro dat san, gia, slot trong, huy lich hay map?",
+    text: t("assistantWelcome"),
   };
+}
+
+function buildDefaultSuggestions(t) {
+  return [t("assistantQuickBooking"), t("assistantQuickSlots"), t("assistantQuickCancel")];
 }
 
 export default function AssistantCenter({ visible, onClose }) {
   const { theme } = useTheme();
+  const { language, t } = useLanguage();
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const [messages, setMessages] = useState([buildWelcomeMessage()]);
-  const [quickSuggestions, setQuickSuggestions] = useState([
-    "Lam sao dat san?",
-    "Toi muon xem slot trong hom nay",
-    "Lam sao huy booking?",
-  ]);
+  const [messages, setMessages] = useState(() => [buildWelcomeMessage(t)]);
+  const [quickSuggestions, setQuickSuggestions] = useState(() => buildDefaultSuggestions(t));
+  const [lastFailedMessage, setLastFailedMessage] = useState("");
   const scrollRef = useRef(null);
 
   const canSend = useMemo(() => String(input || "").trim().length > 0 && !isSending, [input, isSending]);
   const assistantBubbleBackground = theme.mode === "dark" ? "#1f2937" : "#f1f5f9";
   const suggestionChipBackground = theme.mode === "dark" ? "#0f172a" : "#f8fafc";
+  const canRetry = String(lastFailedMessage || "").trim().length > 0 && !isSending;
+
+  useEffect(() => {
+    setQuickSuggestions(buildDefaultSuggestions(t));
+    setMessages((prev) => {
+      if (prev.length === 1 && prev[0]?.id === "welcome") {
+        return [buildWelcomeMessage(t)];
+      }
+      return prev;
+    });
+  }, [t]);
 
   const scrollToBottom = () => {
     requestAnimationFrame(() => {
@@ -46,6 +60,14 @@ export default function AssistantCenter({ visible, onClose }) {
       return;
     }
 
+    const nextHistory = messages
+      .filter((item) => item.id !== "welcome")
+      .slice(-8)
+      .map((item) => ({
+        role: item.role === "assistant" ? "assistant" : "user",
+        text: item.text,
+      }));
+
     pushMessage({
       id: `u-${Date.now()}`,
       role: "user",
@@ -53,17 +75,17 @@ export default function AssistantCenter({ visible, onClose }) {
     });
     setInput("");
     setIsSending(true);
+    setLastFailedMessage("");
 
     try {
-      const historyPayload = messages
-        .filter((item) => item.id !== "welcome")
-        .slice(-8)
-        .map((item) => ({
-          role: item.role === "assistant" ? "assistant" : "user",
-          text: item.text,
-        }));
-      const response = await askAssistant(content, historyPayload);
-      const answer = String(response?.data?.answer || "").trim() || "Xin loi, hien tai minh chua tra loi duoc.";
+      const response = await askAssistant(content, nextHistory, language);
+      const answer = String(response?.data?.answer || "").trim();
+      if (!answer) {
+        throw {
+          message: t("assistantDefaultError"),
+          retryable: true,
+        };
+      }
       const suggestions = Array.isArray(response?.data?.suggestions) ? response.data.suggestions : [];
       pushMessage({
         id: `a-${Date.now()}`,
@@ -74,11 +96,15 @@ export default function AssistantCenter({ visible, onClose }) {
         setQuickSuggestions(suggestions.slice(0, 3));
       }
     } catch (error) {
+      const errorText = String(error?.message || t("assistantDefaultError")).trim() || t("assistantDefaultError");
       pushMessage({
         id: `e-${Date.now()}`,
         role: "assistant",
-        text: error?.response?.data?.message || "Khong the ket noi tro ly luc nay. Vui long thu lai.",
+        text: errorText,
       });
+      if (error?.retryable !== false) {
+        setLastFailedMessage(content);
+      }
     } finally {
       setIsSending(false);
     }
@@ -91,7 +117,7 @@ export default function AssistantCenter({ visible, onClose }) {
           <View style={styles.header}>
             <View style={styles.headerTitleWrap}>
               <Ionicons name="sparkles-outline" size={18} color={theme.info} />
-              <Text style={[styles.title, { color: theme.text }]}>TennisHub Assistant</Text>
+              <Text style={[styles.title, { color: theme.text }]}>{t("assistantTitle")}</Text>
             </View>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={20} color={theme.textSecondary} />
@@ -119,7 +145,12 @@ export default function AssistantCenter({ visible, onClose }) {
                 </Text>
               </View>
             ))}
-            {isSending ? <ActivityIndicator size="small" color={theme.info} style={styles.typing} /> : null}
+            {isSending ? (
+              <View style={styles.typingWrap}>
+                <ActivityIndicator size="small" color={theme.info} style={styles.typing} />
+                <Text style={[styles.typingText, { color: theme.textSecondary }]}>{t("assistantSending")}</Text>
+              </View>
+            ) : null}
           </ScrollView>
 
           {quickSuggestions.length > 0 ? (
@@ -137,12 +168,34 @@ export default function AssistantCenter({ visible, onClose }) {
               ))}
             </ScrollView>
           ) : null}
+          {lastFailedMessage ? (
+            <TouchableOpacity
+              style={[styles.retryBtn, { borderColor: theme.border }]}
+              disabled={!canRetry}
+              onPress={() => {
+                if (!canRetry) {
+                  pushMessage({
+                    id: `e-retry-${Date.now()}`,
+                    role: "assistant",
+                    text: t("assistantRetryNotAvailable"),
+                  });
+                  return;
+                }
+                void handleSend(lastFailedMessage);
+              }}
+            >
+              <Ionicons name="refresh-outline" size={14} color={theme.info} />
+              <Text style={[styles.retryText, { color: canRetry ? theme.info : theme.textSecondary }]}>
+                {t("assistantRetryLastQuestion")}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
 
           <View style={[styles.inputRow, { borderColor: theme.border, backgroundColor: theme.inputBackground }]}>
             <TextInput
               value={input}
               onChangeText={setInput}
-              placeholder="Nhap cau hoi..."
+              placeholder={t("assistantInputPlaceholder")}
               placeholderTextColor="#94a3b8"
               style={[styles.input, { color: theme.text }]}
               multiline
@@ -193,7 +246,9 @@ const styles = StyleSheet.create({
   userBubble: { alignSelf: "flex-end", borderBottomRightRadius: 4 },
   assistantBubble: { alignSelf: "flex-start", borderBottomLeftRadius: 4 },
   bubbleText: { fontSize: 14, lineHeight: 20 },
+  typingWrap: { flexDirection: "row", alignItems: "center", marginVertical: 6, gap: 6 },
   typing: { marginVertical: 6 },
+  typingText: { fontSize: 12, fontWeight: "600" },
   suggestionRow: { marginBottom: 8, maxHeight: 40 },
   suggestionChip: {
     borderWidth: 1,
@@ -203,6 +258,18 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   suggestionText: { fontSize: 12, fontWeight: "600" },
+  retryBtn: {
+    borderWidth: 1,
+    borderRadius: 999,
+    minHeight: 34,
+    paddingHorizontal: 10,
+    marginBottom: 8,
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  retryText: { fontSize: 12, fontWeight: "700" },
   inputRow: {
     borderWidth: 1,
     borderRadius: 10,

@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Modal, StyleSheet, View } from "react-native";
 import CourtDetailScreen from "./CourtDetailScreen";
 import EditProfileScreen from "./EditProfileScreen";
+import UserPaymentResultScreen from "./UserPaymentResultScreen";
 import UserSettingsScreen from "./UserSettingsScreen";
 import UserBookingsScreen from "./UserBookingsScreen";
 import UserHomeScreen from "./UserHomeScreen";
@@ -16,6 +17,7 @@ const tabScreenByName = {
 export default function UserMainScreen() {
   const [activeTab, setActiveTab] = useState("Home");
   const [activeScreen, setActiveScreen] = useState(null);
+  const [activeScreenParams, setActiveScreenParams] = useState(null);
   const [selectedCourtId, setSelectedCourtId] = useState(null);
   const [favoriteRevision, setFavoriteRevision] = useState(0);
   const [favoriteByCourtId, setFavoriteByCourtId] = useState({});
@@ -35,8 +37,26 @@ export default function UserMainScreen() {
 
   const handleTabPress = (tab) => {
     setActiveScreen(null);
+    setActiveScreenParams(null);
     setSelectedCourtId(null);
     setActiveTab(tab);
+  };
+
+  const handleNavigate = (target) => {
+    if (!target) {
+      return;
+    }
+    if (typeof target === "string") {
+      setActiveScreen(target);
+      setActiveScreenParams(null);
+      return;
+    }
+    const screen = String(target?.screen || "").trim();
+    if (!screen) {
+      return;
+    }
+    setActiveScreen(screen);
+    setActiveScreenParams(target?.params || null);
   };
 
   if (activeScreen === "edit-profile") {
@@ -47,11 +67,24 @@ export default function UserMainScreen() {
     return <UserSettingsScreen onBack={() => setActiveScreen(null)} onNavigate={setActiveScreen} />;
   }
 
+  if (activeScreen === "payment-result") {
+    return (
+      <UserPaymentResultScreen
+        result={activeScreenParams}
+        onBack={() => {
+          setActiveScreen(null);
+          setActiveScreenParams(null);
+          setActiveTab("Bookings");
+        }}
+      />
+    );
+  }
+
   return (
     <>
       <ActiveScreen
         onTabPress={handleTabPress}
-        onNavigate={setActiveScreen}
+        onNavigate={handleNavigate}
         favoritesRevision={favoriteRevision}
         onFavoriteChanged={() => setFavoriteRevision((prev) => prev + 1)}
         favoriteOverrides={favoriteByCourtId}

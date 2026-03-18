@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, Text, View, ActivityIndicator, Alert, Platform, TouchableOpacity } from "react-native";
+import { StyleSheet, Text, View, ActivityIndicator, Alert, Platform, TouchableOpacity, Modal } from "react-native";
+import { WebView } from "react-native-webview";
 import BookingCard from "../../components/BookingCard";
 import Card from "../../components/Card";
 import RoleTopBar from "../../components/RoleTopBar";
@@ -9,7 +10,12 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { colors, radius } from "../../styles/theme";
 import { getMyBookings, cancelBooking } from "../../services/bookingService";
-import { confirmMockPayment } from "../../services/paymentService";
+import {
+  createVnpayPayment,
+  getBookingPaymentStatus,
+  isVnpayReturnUrl,
+  processVnpayReturnUrl,
+} from "../../services/paymentService";
 import { formatVND } from "../../utils/currency";
 import { normalizeImageUrl } from "../../utils/imageUrl";
 
@@ -41,6 +47,9 @@ export default function UserBookingsScreen({ onTabPress, onNavigate }) {
   const [error, setError] = useState(null);
   const [activeFilter, setActiveFilter] = useState("all");
   const [payingBookingId, setPayingBookingId] = useState("");
+  const [paymentWebViewUrl, setPaymentWebViewUrl] = useState("");
+  const [paymentWebViewBookingId, setPaymentWebViewBookingId] = useState("");
+  const [isFinalizingPayment, setIsFinalizingPayment] = useState(false);
   const palette = getPalette(isDarkMode);
 
   const fetchBookings = async () => {
@@ -97,16 +106,86 @@ export default function UserBookingsScreen({ onTabPress, onNavigate }) {
     );
   };
 
-  const handleConfirmPayment = async (bookingId) => {
+  const waitMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const pollPaymentStatus = async (bookingId, maxAttempts = 5) => {
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const statusRes = await getBookingPaymentStatus(bookingId);
+      const status = String(statusRes?.data?.paymentStatus || "").toLowerCase();
+      if (status === "paid" || status === "failed") {
+        return statusRes;
+      }
+      if (attempt < maxAttempts - 1) {
+        await waitMs(700);
+      }
+    }
+    return getBookingPaymentStatus(bookingId);
+  };
+
+  const syncPaymentStatus = async (bookingId, responseCodeHint = "") => {
     try {
-      setPayingBookingId(bookingId);
-      await confirmMockPayment(bookingId);
-      Alert.alert(t("payment"), t("bookingsPaymentSuccess"));
-      await fetchBookings();
+      const statusRes = await pollPaymentStatus(bookingId);
+      const paymentStatus = statusRes?.data?.paymentStatus || "unpaid";
+      const latestPayment = statusRes?.data?.latestPayment || {};
+      let resultStatus = "failed";
+      if (paymentStatus === "paid") {
+        resultStatus = "success";
+      } else if (String(responseCodeHint || "") === "24") {
+        resultStatus = "cancelled";
+      } else {
+        resultStatus = "failed";
+      }
+      onNavigate?.({
+        screen: "payment-result",
+        params: {
+          status: resultStatus,
+          bookingId: String(statusRes?.data?.bookingId || bookingId),
+          transactionId: String(latestPayment?.transactionId || statusRes?.data?.paymentOrderId || ""),
+          amount: Number(latestPayment?.amount || 0),
+          detailMessage: String(latestPayment?.message || ""),
+        },
+      });
     } catch (err) {
       Alert.alert(t("bookingsPaymentError"), err.message || t("bookingsPaymentErrorMessage"));
     } finally {
+      await fetchBookings();
+    }
+  };
+
+  const closePaymentWebView = () => {
+    setPaymentWebViewUrl("");
+    setPaymentWebViewBookingId("");
+    setPayingBookingId("");
+  };
+
+  const handleConfirmPayment = async (bookingId) => {
+    try {
+      setPayingBookingId(bookingId);
+      const paymentRes = await createVnpayPayment(bookingId);
+      const paymentUrl = String(paymentRes?.data?.paymentUrl || "");
+      if (!paymentUrl) {
+        throw new Error(t("bookingsPaymentInitFailed"));
+      }
+      setPaymentWebViewBookingId(bookingId);
+      setPaymentWebViewUrl(paymentUrl);
+    } catch (err) {
       setPayingBookingId("");
+      Alert.alert(t("bookingsPaymentError"), err.message || t("bookingsPaymentInitFailed"));
+    }
+  };
+
+  const finalizeVnpayPayment = async (returnUrl, bookingId, responseCodeHint = "") => {
+    if (!bookingId || isFinalizingPayment) {
+      return;
+    }
+    setIsFinalizingPayment(true);
+    try {
+      await processVnpayReturnUrl(returnUrl);
+    } catch {
+      // Fall back to status polling even if callback request fails.
+    } finally {
+      await syncPaymentStatus(bookingId, responseCodeHint);
+      setIsFinalizingPayment(false);
     }
   };
 
@@ -186,6 +265,56 @@ export default function UserBookingsScreen({ onTabPress, onNavigate }) {
           </>
         )}
       </ScreenContainer>
+      <Modal visible={Boolean(paymentWebViewUrl)} animationType="slide" onRequestClose={closePaymentWebView}>
+        <View style={[styles.paymentModalRoot, { backgroundColor: palette.background }]}>
+          <View style={[styles.paymentModalHeader, { borderBottomColor: palette.border }]}>
+            <Text style={[styles.paymentModalTitle, { color: palette.textPrimary }]}>{t("bookingsVnpayTitle")}</Text>
+            <TouchableOpacity
+              onPress={() => {
+                closePaymentWebView();
+                Alert.alert(t("payment"), t("bookingsPaymentCancelled"));
+              }}
+            >
+              <Text style={[styles.paymentModalClose, { color: palette.textSecondary }]}>{t("cancel")}</Text>
+            </TouchableOpacity>
+          </View>
+          {paymentWebViewUrl ? (
+            <WebView
+              source={{ uri: paymentWebViewUrl }}
+              startInLoadingState
+              renderLoading={() => (
+                <View style={styles.paymentLoadingWrap}>
+                  <ActivityIndicator size="large" color={colors.info} />
+                </View>
+              )}
+              onShouldStartLoadWithRequest={(request) => {
+                if (isVnpayReturnUrl(request?.url)) {
+                  const url = String(request?.url || "");
+                  const bookingId = paymentWebViewBookingId;
+                  closePaymentWebView();
+                  const responseCodeMatch = url.match(/[?&]vnp_ResponseCode=([^&]+)/i);
+                  const responseCodeHint = responseCodeMatch?.[1] || "";
+                  if (bookingId) {
+                    void finalizeVnpayPayment(url, bookingId, responseCodeHint);
+                  }
+                  return false;
+                }
+                return true;
+              }}
+              onError={() => {
+                closePaymentWebView();
+                Alert.alert(t("bookingsPaymentError"), t("bookingsPaymentErrorMessage"));
+              }}
+            />
+          ) : null}
+          {isFinalizingPayment ? (
+            <View style={styles.paymentLoadingWrap}>
+              <ActivityIndicator size="large" color={colors.info} />
+              <Text style={[styles.finalizingText, { color: palette.textSecondary }]}>{t("bookingsProcessing")}</Text>
+            </View>
+          ) : null}
+        </View>
+      </Modal>
       <TabBar tabs={["Home", "Bookings", "Profile"]} active="Bookings" onTabPress={onTabPress} />
     </View>
   );
@@ -202,4 +331,17 @@ const styles = StyleSheet.create({
   loader: { marginTop: 20 },
   errorText: { color: colors.danger, marginTop: 20, textAlign: "center" },
   emptyText: { color: colors.textSecondary, marginTop: 4, marginBottom: 12 },
+  paymentModalRoot: { flex: 1 },
+  paymentModalHeader: {
+    minHeight: 56,
+    borderBottomWidth: 1,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  paymentModalTitle: { fontSize: 17, fontWeight: "700" },
+  paymentModalClose: { fontSize: 15, fontWeight: "600" },
+  paymentLoadingWrap: { flex: 1, justifyContent: "center", alignItems: "center" },
+  finalizingText: { marginTop: 10, fontSize: 14, fontWeight: "600" },
 });

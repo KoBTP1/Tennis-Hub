@@ -16,7 +16,7 @@ const paymentSchema = new mongoose.Schema(
     },
     provider: {
       type: String,
-      enum: ["mock"],
+      enum: ["mock", "vnpay"],
       default: "mock",
     },
     amount: {
